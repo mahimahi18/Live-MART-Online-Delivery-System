@@ -1,3 +1,4 @@
+import app from "./firebase";  // this imports your firebase.js file
 import logo from './logo.svg';
 import './App.css';
 
