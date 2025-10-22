@@ -1,77 +1,24 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-
-// --- FIX: Define all page components inside this file for the preview ---
-
-// Placeholder for Home page
-function Home() {
-  return <div><h1>Home Page</h1></div>;
-}
-
-// Placeholder for Products page
-function Products() {
-  return <div><h1>Products Page</h1></div>;
-}
-
-// Placeholder for Cart page
-function Cart() {
-  return <div><h1>Cart Page</h1></div>;
-}
-
-// Placeholder for Profile page
-function Profile() {
-  return <div><h1>Profile Page</h1></div>;
-}
-
-// Placeholder for Signup page
-function Signup() {
-  return <div><h1>Signup Page</h1></div>;
-}
-
-// Placeholder for Login page
-function Login() {
-  return <div><h1>Login Page</h1></div>;
-}
-
-// Placeholder for CustomerDashboard page
-function CustomerDashboard() {
-  return <div><h1>Customer Dashboard</h1></div>;
-}
-
-// Placeholder for RetailerDashboard page
-function RetailerDashboard() {
-  return <div><h1>Retailer Dashboard</h1></div>;
-}
-
-// Placeholder for WholesalerDashboard page
-function WholesalerDashboard() {
-  return <div><h1>Wholesaler Dashboard</h1></div>;
-}
-
-// --- End of placeholder components ---
-
+import Home from "./pages/Home";
+import Products from "./pages/Products";
+import Cart from "./pages/Cart";
+import Profile from "./pages/Profile";
+import Signup from "./pages/Signup";
+import Login from "./pages/Login";
+import CustomerDashboard from "./pages/CustomerDashboard";
+import RetailerDashboard from "./pages/RetailerDashboard";
+import WholesalerDashboard from "./pages/WholesalerDashboard";
 
 function App() {
   return (
     <Router>
-      <nav style={{ padding: "10px", background: "#eee", flexWrap: "wrap" }}>
+      <nav style={{ padding: "10px", background: "#eee" }}>
         <Link to="/" style={{ margin: "10px" }}>Home</Link>
         <Link to="/products" style={{ margin: "10px" }}>Products</Link>
         <Link to="/cart" style={{ margin: "10px" }}>Cart</Link>
         <Link to="/profile" style={{ margin: "10px" }}>Profile</Link>
         <Link to="/signup" style={{ margin: "10px" }}>Signup</Link>
         <Link to="/login" style={{ margin: "10px" }}>Login</Link>
-
-        {/* --- Links to Dashboards --- */}
-        <Link to="/customer-dashboard" style={{ margin: "10px" }}>
-          Customer
-        </Link>
-        <Link to="/retailer-dashboard" style={{ margin: "10px" }}>
-          Retailer
-        </Link>
-        <Link to="/wholesaler-dashboard" style={{ margin: "10px" }}>
-          Wholesaler
-        </Link>
       </nav>
 
       <Routes>
@@ -81,7 +28,7 @@ function App() {
         <Route path="/cart" element={<Cart />} />
         <Route path="/profile" element={<Profile />} />
 
-        {/* Auth + dashboard routes (these were already correct) */}
+        {/* New auth + dashboard routes */}
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/customer-dashboard" element={<CustomerDashboard />} />
@@ -92,5 +39,4 @@ function App() {
   );
 }
 
-export default App;
-
+export default App; modify the routing to the three dashboard pages too
