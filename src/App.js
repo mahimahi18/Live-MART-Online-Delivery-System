@@ -1,4 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import app from "./firebase"; // <-- From "Incoming"
+import logo from './logo.svg'; // <-- From "Incoming"
+import './App.css'; // <-- From "Incoming"
+
+// Imports from "Current"
 import Home from "./pages/Home";
 import Products from "./pages/Products";
 import Cart from "./pages/Cart";
