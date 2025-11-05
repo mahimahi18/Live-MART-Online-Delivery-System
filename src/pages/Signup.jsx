@@ -3,6 +3,13 @@ import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 import app from "../firebase";
 
+// Import React-Bootstrap components
+import Container from 'react-bootstrap/Container';
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
+import Form from 'react-bootstrap/Form';
+import Button from 'react-bootstrap/Button';
+
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -33,18 +40,77 @@ function Signup() {
   };
 
   return (
-    <form onSubmit={handleSignup}>
-      <input placeholder="Name" onChange={(e) => setName(e.target.value)} />
-      <input placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
-      <input placeholder="Phone" onChange={(e) => setPhone(e.target.value)} />
-      <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
-      <select onChange={(e) => setRole(e.target.value)}>
-        <option value="Customer">Customer</option>
-        <option value="Retailer">Retailer</option>
-        <option value="Wholesaler">Wholesaler</option>
-      </select>
-      <button type="submit">Signup</button>
-    </form>
+    <Container>
+      <Row className="justify-content-md-center">
+        <Col xs={12} md={6}>
+          <h2 className="text-center mb-4">Create Your Account</h2>
+          <Form onSubmit={handleSignup}>
+            {/* Name Field */}
+            <Form.Group className="mb-3" controlId="formBasicName">
+              <Form.Label>Name</Form.Label>
+              <Form.Control 
+                type="text" 
+                placeholder="Enter your full name" 
+                onChange={(e) => setName(e.target.value)} 
+                required 
+              />
+            </Form.Group>
+
+            {/* Email Field */}
+            <Form.Group className="mb-3" controlId="formBasicEmail">
+              <Form.Label>Email address</Form.Label>
+              <Form.Control 
+                type="email" 
+                placeholder="Enter email" 
+                onChange={(e) => setEmail(e.target.value)} 
+                required 
+              />
+            </Form.Group>
+
+            {/* Phone Field */}
+            <Form.Group className="mb-3" controlId="formBasicPhone">
+              <Form.Label>Phone Number</Form.Label>
+              <Form.Control 
+                type="tel" 
+                placeholder="Enter phone number" 
+                onChange={(e) => setPhone(e.target.value)} 
+              />
+            </Form.Group>
+
+            {/* Password Field */}
+            <Form.Group className="mb-3" controlId="formBasicPassword">
+              <Form.Label>Password</Form.Label>
+              <Form.Control 
+                type="password" 
+                placeholder="Password" 
+                onChange={(e) => setPassword(e.target.value)} 
+                required 
+              />
+            </Form.Group>
+
+            {/* Role Field */}
+            <Form.Group className="mb-3" controlId="formBasicRole">
+              <Form.Label>I am a...</Form.Label>
+              <Form.Select 
+                value={role} 
+                onChange={(e) => setRole(e.target.value)}
+              >
+                <option value="Customer">Customer</option>
+                <option value="Retailer">Retailer</option>
+                <option value="Wholesaler">Wholesaler</option>
+              </Form.Select>
+            </Form.Group>
+
+            {/* Submit Button */}
+            <div className="d-grid gap-2">
+              <Button variant="primary" type="submit" size="lg">
+                Signup
+              </Button>
+            </div>
+          </Form>
+        </Col>
+      </Row>
+    </Container>
   );
 }
 
