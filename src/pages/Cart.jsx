@@ -1,129 +1,144 @@
-import { useState } from 'react';
-import Container from 'react-bootstrap/Container';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
-import Card from 'react-bootstrap/Card';
-import Button from 'react-bootstrap/Button';
-import { Link } from 'react-router-dom';
-import ListGroup from 'react-bootstrap/ListGroup';
-import Image from 'react-bootstrap/Image';
-
-// This is a placeholder. 
-// In your real app, this data would come from context, Redux, or local storage.
-const dummyCartItems = [
-  {
-    id: 1,
-    name: "Men's Cotton T-Shirt",
-    price: 25.00,
-    quantity: 2,
-    image: "https://via.placeholder.com/100x100?text=T-Shirt"
-  },
-  {
-    id: 5,
-    name: "Running Shoes",
-    price: 79.99,
-    quantity: 1,
-    image: "https://via.placeholder.com/100x100?text=Shoes"
-  }
-];
+import React, { useState } from 'react';
+import { useCart } from '../context/CartContext'; // Import the cart hook
+import { placeOrder } from '../services/orderService'; // Import your NEW order service
+import { getAuth } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
+import './Cart.css';
 
 
 function Cart() {
-  // --- STATE ---
-  // We'll use this state to switch between the empty and filled cart views.
-  // To test, you can change '[]' to 'dummyCartItems' to see the filled cart.
-  const [cartItems, setCartItems] = useState([]); 
-  // const [cartItems, setCartItems] = useState(dummyCartItems); // <-- Use this line to test the "filled" view
+  const { cart, removeFromCart, updateQuantity, clearCart, totalAmount } = useCart();
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [paymentMode, setPaymentMode] = useState("Online");
+  const [loading, setLoading] = useState(false);
+ 
+  const auth = getAuth();
+  const navigate = useNavigate();
 
 
-  // --- CALCULATIONS ---
-  const itemsPrice = cartItems.reduce((acc, item) => acc + item.quantity * item.price, 0);
-  const taxPrice = itemsPrice * 0.15; // 15% tax
-  const shippingPrice = itemsPrice > 200 ? 0 : 20; // Free shipping over $200
-  const totalPrice = itemsPrice + taxPrice + shippingPrice;
+  const handlePlaceOrder = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Please log in to place an order.");
+      navigate('/login');
+      return;
+    }
+    if (cart.length === 0) {
+      alert("Your cart is empty.");
+      return;
+    }
+    if (!deliveryAddress) {
+      alert("Please enter a delivery address.");
+      return;
+    }
 
 
-  // --- RENDER ---
+    setLoading(true);
+
+
+    // 1. Format the cart for the backend
+    const cartForBackend = cart.map(item => ({
+      productId: item.id,
+      quantity: item.quantity
+    }));
+
+
+    const orderDetails = {
+      cart: cartForBackend,
+      deliveryAddress: deliveryAddress,
+      paymentMode: paymentMode,
+    };
+
+
+    try {
+      // 2. Call the Cloud Function!
+      console.log("Placing order...", orderDetails);
+      const result = await placeOrder(orderDetails);
+     
+      // 3. Handle Success
+      console.log("Order placed successfully!", result.data.orderId);
+      alert(`Order successful! Your Order ID is: ${result.data.orderId}`);
+      clearCart();
+      navigate('/my-orders'); // Send them to their new order page
+     
+    } catch (error) {
+      // 4. Handle Errors (like "Not enough stock")
+      console.error("Error placing order:", error);
+      alert(`Error placing order: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   return (
-    <Container className="my-4">
-      <h1 className="mb-4">🛒 Your Shopping Cart</h1>
-      
-      {cartItems.length === 0 ? (
-        // --- EMPTY CART VIEW ---
-        <div className="text-center p-5 bg-light rounded">
-          <h2>Your Cart is Empty!</h2>
-          <p>Looks like you haven't added anything to your cart yet.</p>
-          <Button as={Link} to="/products" variant="primary">
-            Start Shopping
-          </Button>
-        </div>
-      ) : (
-        // --- FILLED CART VIEW ---
-        <Row>
-          {/* Column 1: Cart Items List */}
-          <Col md={8}>
-            <ListGroup variant="flush">
-              {cartItems.map(item => (
-                <ListGroup.Item key={item.id} className="py-3">
-                  <Row className="align-items-center">
-                    <Col md={2}>
-                      <Image src={item.image} alt={item.name} fluid rounded />
-                    </Col>
-                    <Col md={3}>
-                      <Link to={`/products/${item.id}`}>{item.name}</Link>
-                    </Col>
-                    <Col md={2}>
-                      ${item.price.toFixed(2)}
-                    </Col>
-                    <Col md={3}>
-                      {/* Here you would add buttons to change quantity */}
-                      Quantity: {item.quantity}
-                    </Col>
-                    <Col md={2}>
-                      <Button variant="light" size="sm">Remove</Button>
-                    </Col>
-                  </Row>
-                </ListGroup.Item>
-              ))}
-            </ListGroup>
-          </Col>
-
-          {/* Column 2: Order Summary */}
-          <Col md={4}>
-            <Card>
-              <Card.Body>
-                <Card.Title>Order Summary</Card.Title>
-                <ListGroup variant="flush">
-                  <ListGroup.Item className="d-flex justify-content-between">
-                    <span>Items</span>
-                    <strong>${itemsPrice.toFixed(2)}</strong>
-                  </ListGroup.Item>
-                  <ListGroup.Item className="d-flex justify-content-between">
-                    <span>Tax</span>
-                    <strong>${taxPrice.toFixed(2)}</strong>
-                  </ListGroup.Item>
-                  <ListGroup.Item className="d-flex justify-content-between">
-                    <span>Shipping</span>
-                    <strong>${shippingPrice.toFixed(2)}</strong>
-                  </ListGroup.Item>
-                  <ListGroup.Item className="d-flex justify-content-between">
-                    <h4>Total</h4>
-                    <h4>${totalPrice.toFixed(2)}</h4>
-                  </ListGroup.Item>
-                  {/* <-- FIXED: Removed extra ListGroup.Item tag */}
-                </ListGroup>
-                <div className="d-grid mt-3">
-                  <Button variant="primary" size="lg">
-                    Proceed to Checkout
-                  </Button> {/* <-- FIXED: Was </Click> */}
+    <div className="cart-container">
+      <h1>Shopping Cart</h1>
+      <div className="cart-layout">
+        <div className="cart-items">
+          {cart.length === 0 ? (
+            <p>Your cart is empty.</p>
+          ) : (
+            cart.map(item => (
+              <div key={item.id} className="cart-item">
+                <img src={item.imageURL || 'https://via.placeholder.com/100'} alt={item.name} />
+                <div className="item-details">
+                  <h3>{item.name}</h3>
+                  <p>Price: ${item.price}</p>
+                  <div className="quantity-controls">
+                    <button onClick={() => updateQuantity(item.id, -1)}>-</button>
+                    <span>{item.quantity}</span>
+                    <button onClick={() => updateQuantity(item.id, 1)}>+</button>
+                  </div>
                 </div>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
-      )}
-    </Container>
+                <button onClick={() => removeFromCart(item.id)} className="remove-btn">Remove</button>
+              </div>
+            ))
+          )}
+        </div>
+       
+        {cart.length > 0 && (
+          <div className="cart-summary">
+            <h2>Summary</h2>
+            <div className="summary-row">
+              <span>Subtotal:</span>
+              <span>${totalAmount.toFixed(2)}</span>
+            </div>
+           
+            {/* --- Checkout Form --- */}
+            <div className="checkout-form">
+              <label>Delivery Address</label>
+              <input
+                type="text"
+                placeholder="123 Main St..."
+                value={deliveryAddress}
+                onChange={(e) => setDeliveryAddress(e.target.value)}
+              />
+              <label>Payment Mode</label>
+              <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
+                <option value="Online">Online</option>
+                <option value="Offline">Cash on Delivery</option>
+              </select>
+            </div>
+            {/* --- End Checkout Form --- */}
+           
+            <div className="summary-row total">
+              <span>Total:</span>
+              <span>${totalAmount.toFixed(2)}</span>
+            </div>
+            <button
+              className="checkout-btn"
+              onClick={handlePlaceOrder}
+              disabled={loading}
+            >
+              {loading ? "Placing Order..." : "Place Order"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
+
 
 export default Cart;
