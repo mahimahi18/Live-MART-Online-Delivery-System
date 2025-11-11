@@ -36,3 +36,16 @@
     transform: rotate(360deg);
   }
 }
+body {
+  background-color: #fafafa;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.container {
+  margin-top: 2rem;
+}
+
+.navbar {
+  margin-bottom: 1.5rem;
+}
+

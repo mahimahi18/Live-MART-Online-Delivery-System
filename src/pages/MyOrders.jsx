@@ -1,19 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getMyOrders } from '../services/OrderService'; // Import your NEW order service
 import app from '../firebase';
-import './MyOrders.css'; // We'll create this CSS fconst auth = getAuth(app);
+import { getMyOrders } from '../services/OrderService'; 
+import './MyOrders.css';
 
+const auth = getAuth(app);
 
 function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // User is logged in, fetch their orders
         console.log("Fetching orders for user:", user.uid);
         getMyOrders(user.uid)
           .then(data => {
@@ -25,26 +24,20 @@ function MyOrders() {
             setLoading(false);
           });
       } else {
-        // No user is signed in.
         setLoading(false);
       }
     });
 
-
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
-
 
   if (loading) {
     return <h1>Loading your orders...</h1>;
   }
 
-
   if (orders.length === 0) {
     return <h1>You have no orders.</h1>;
   }
-
 
   return (
     <div className="my-orders-container">
@@ -71,6 +64,5 @@ function MyOrders() {
     </div>
   );
 }
-
 
 export default MyOrders;
