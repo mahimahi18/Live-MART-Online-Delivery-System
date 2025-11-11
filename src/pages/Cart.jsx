@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useCart } from '../context/CartContext'; // Import the cart hook
-import { placeOrder } from '../services/orderService'; // Import your NEW order service
+import { placeOrder } from '../services/OrderService'; // Import your NEW order service
 import { getAuth } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 import './Cart.css';

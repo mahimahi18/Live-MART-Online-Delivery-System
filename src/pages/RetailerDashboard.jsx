@@ -7,7 +7,7 @@ import Card from 'react-bootstrap/Card';
 import ListGroup from 'react-bootstrap/ListGroup';
 import Button from 'react-bootstrap/Button';
 import Table from 'react-bootstrap/Table';
-import { getPendingOrders, updateOrderStatus } from '../services/orderService';
+import { getPendingOrders, updateOrderStatus } from '../services/OrderService';
 import './RetailerDashboard.css';
 
 // Placeholder for the retailer's products

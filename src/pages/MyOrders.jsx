@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getMyOrders } from '../services/orderService'; // Import your NEW order service
+import { getMyOrders } from '../services/OrderService'; // Import your NEW order service
 import app from '../firebase';
-import './MyOrders.css'; // We'll create this CSS file
-
-
-const auth = getAuth(app);
+import './MyOrders.css'; // We'll create this CSS fconst auth = getAuth(app);
 
 
 function MyOrders() {

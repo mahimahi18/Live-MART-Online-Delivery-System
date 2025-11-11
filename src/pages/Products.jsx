@@ -4,7 +4,7 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Button from 'react-bootstrap/Button';
-import { getAllProducts } from '../services/productService';
+import { getAllProducts } from '../services/ProductService';
 import { useCart } from '../context/CartContext';
 
 export default function Products() {
