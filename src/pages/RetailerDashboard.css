@@ -1,0 +1,44 @@
+.retailer-dashboard {
+  padding: 20px;
+}
+.add-product-btn {
+  display: inline-block;
+  background-color: #28a745;
+  color: white;
+  padding: 12px 20px;
+  text-decoration: none;
+  border-radius: 5px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.inventory-table th, .inventory-table td {
+  border: 1px solid #ddd;
+  padding: 12px;
+  text-align: left;
+}
+.inventory-table th {
+  background-color: #f4f4f4;
+}
+.inventory-table .actions {
+  display: flex;
+  gap: 10px;
+}
+.inventory-table .edit-btn {
+  background-color: #007bff;
+  color: white;
+  padding: 5px 10px;
+  text-decoration: none;
+  border-radius: 3px;
+}
+.inventory-table .delete-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
