@@ -1,9 +1,10 @@
 import { useState } from "react";
 // Import useNavigate and Link from React Router
 import { useNavigate, Link } from "react-router-dom"; 
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
-import app from "../firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+// Import the pre-initialized auth and db from your firebase.js
+import { auth, db } from "../firebase";
 
 // Import React-Bootstrap components
 import Container from 'react-bootstrap/Container';
@@ -12,8 +13,8 @@ import Col from 'react-bootstrap/Col';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 
-const auth = getAuth(app);
-const db = getFirestore(app);
+//const auth = getAuth(app);
+//const db = getFirestore(app);
 
 function Login() {
   const [email, setEmail] = useState("");

@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, doc, setDoc } from "firebase/firestore";
-import app from "../firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+// We import the pre-initialized auth and db from our firebase.js
+import { auth, db } from "../firebase";
 
 // Import React-Bootstrap components
 import Container from 'react-bootstrap/Container';
@@ -10,8 +11,8 @@ import Col from 'react-bootstrap/Col';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 
-const auth = getAuth(app);
-const db = getFirestore(app);
+//const auth = getAuth(app);
+//const db = getFirestore(app);
 
 function Signup() {
   const [name, setName] = useState("");

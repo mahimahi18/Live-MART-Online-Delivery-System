@@ -1,8 +1,11 @@
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import app from "./firebase";
-import './App.css';
-import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
+// --- FIX START ---
+// We import the pre-initialized auth and db, not app
+import { auth, db } from "./firebase"; 
+// We import the functions we need
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+// --- FIX END ---
 import { useEffect, useState } from "react";
 
 // ✅ Import all pages
@@ -22,17 +25,21 @@ import ProductForm from "./pages/ProductForm";
 import Container from 'react-bootstrap/Container';
 import Nav from 'react-bootstrap/Nav';
 import Navbar from 'react-bootstrap/Navbar';
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute from "./components/ProtectedRoute"; // Make sure this file is also fixed!
+
+import 'bootstrap/dist/css/bootstrap.min.css';
+import './App.css';
 
 function App() {
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+  // const auth = getAuth(app); // No longer needed
+  // const db = getFirestore(app); // No longer needed
 
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 'auth' and 'db' are now the direct imports
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -52,10 +59,10 @@ function App() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [auth, db]);
+  }, []); // We can remove auth and db from dependencies, as they are stable imports
 
   const handleLogout = async () => {
-    await signOut(auth);
+    await signOut(auth); // 'auth' is the direct import
   };
 
   if (loading) return <div className="text-center mt-5">Loading...</div>;
@@ -81,13 +88,13 @@ function App() {
               )}
 
               {/* ✅ Role-based Dashboards */}
-              {user && role === "customer" && (
+              {user && role === "Customer" && ( // Fixed logic to check role
                 <Nav.Link as={Link} to="/customer-dashboard">Customer Dashboard</Nav.Link>
               )}
-              {user && role === "retailer" && (
+              {user && role === "Retailer" && ( // Fixed logic to check role
                 <Nav.Link as={Link} to="/retailer-dashboard">Retailer Dashboard</Nav.Link>
               )}
-              {user && role === "wholesaler" && (
+              {user && role === "Wholesaler" && ( // Fixed logic to check role
                 <Nav.Link as={Link} to="/wholesaler-dashboard">Wholesaler Dashboard</Nav.Link>
               )}
             </Nav>
@@ -137,6 +144,11 @@ function App() {
               <WholesalerDashboard />
             </ProtectedRoute>
           } />
+          
+          {/* You were missing these routes from your *new* file */}
+          <Route path="/add-product" element={<ProtectedRoute allowedRole="retailer" userRole={role}><ProductForm /></ProtectedRoute>} />
+          <Route path="/edit-product/:productId" element={<ProtectedRoute allowedRole="retailer" userRole={role}><ProductForm /></ProtectedRoute>} />
+
         </Routes>
       </div>
     </Router>

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { getAuth, signOut } from "firebase/auth"; // <-- FIXED ERROR 1
-import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth"; // We only need signOut
+import { doc, getDoc } from "firebase/firestore"; // We only need doc and getDoc
 import { useNavigate } from 'react-router-dom';
-import app from "../firebase";
+// Import the pre-initialized auth and db from firebase.js
+import { auth, db } from "../firebase";
 
 // Import React-Bootstrap components
 import Container from 'react-bootstrap/Container';
@@ -12,8 +13,8 @@ import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
 
-const auth = getAuth(app);
-const db = getFirestore(app);
+//const auth = getAuth(app);
+//const db = getFirestore(app);
 
 function Profile() {
   const navigate = useNavigate();

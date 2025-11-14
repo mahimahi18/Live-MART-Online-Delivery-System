@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import app from '../firebase';
-import { getMyOrders } from '../services/OrderService'; 
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebase'; // Import the pre-initialized auth
+import { getMyOrders } from '../services/orderService'; 
 import './MyOrders.css';
 
-const auth = getAuth(app);
+//const auth = getAuth(app);
 
 function MyOrders() {
   const [orders, setOrders] = useState([]);

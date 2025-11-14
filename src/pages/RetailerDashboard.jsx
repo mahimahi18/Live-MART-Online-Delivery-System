@@ -6,12 +6,12 @@ import Card from 'react-bootstrap/Card';
 import Button from 'react-bootstrap/Button';
 import Table from 'react-bootstrap/Table';
 import { Link, useNavigate } from 'react-router-dom';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { getMyProducts, deleteProduct } from '../services/ProductService';
-import app from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { getMyProducts, deleteProduct } from '../services/productService';
+import { auth } from '../firebase'; 
 import './RetailerDashboard.css';
 
-const auth = getAuth(app);
+//const auth = getAuth(app);
 
 export default function RetailerDashboard() {
   const [products, setProducts] = useState([]);

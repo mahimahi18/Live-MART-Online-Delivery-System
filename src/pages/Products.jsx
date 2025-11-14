@@ -4,7 +4,7 @@ import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
 import Button from 'react-bootstrap/Button';
-import { getAllProducts } from '../services/ProductService';
+import { getAllProducts } from '../services/productService';
 import { useCart } from '../context/CartContext';
 import './Products.css'; // Optional custom CSS for grid and responsiveness
 

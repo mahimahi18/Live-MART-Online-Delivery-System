@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
-import { placeOrder } from '../services/OrderService';
-import app from '../firebase';
-import { getAuth } from 'firebase/auth';
+import { placeOrder } from '../services/orderService';
+import { auth } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import './Cart.css';
 
-const auth = getAuth(app);
+//const auth = getAuth(app);
 
 function Cart() {
   const { cart, removeFromCart, updateQuantity, clearCart, totalAmount } = useCart();
