@@ -25,18 +25,67 @@ import ProductForm from "./pages/ProductForm";
 import Container from 'react-bootstrap/Container';
 import Nav from 'react-bootstrap/Nav';
 import Navbar from 'react-bootstrap/Navbar';
-import ProtectedRoute from "./components/ProtectedRoute"; // Make sure this file is also fixed!
+import Button from 'react-bootstrap/Button'; // <-- IMPORT BUTTON
+import Row from 'react-bootstrap/Row';     // <-- IMPORT ROW
+import Col from 'react-bootstrap/Col';     // <-- IMPORT COL
+import ProtectedRoute from "./components/ProtectedRoute"; 
+
+// ✅ Icon import
+import { Shop } from 'react-bootstrap-icons'; // <-- IMPORT ICON
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
+
+// --- NEW FOOTER COMPONENT ---
+// We define the footer here at the top level
+function AppFooter() {
+  return (
+    <footer className="py-4 mt-5 bg-dark text-white">
+      <Container>
+        <Row>
+          <Col md={4}>
+            <h5>LiveMart</h5>
+            <p>Freshness delivered to your doorstep.</p>
+          </Col>
+          <Col md={2}>
+            <h5>Quick Links</h5>
+            <ul className="list-unstyled">
+              <li><Link to="/" className="text-white text-decoration-none">Home</Link></li>
+              <li><Link to="/products" className="text-white text-decoration-none">Products</Link></li>
+              {/* Add more links as needed */}
+            </ul>
+          </Col>
+          <Col md={3}>
+            <h5>Contact</h5>
+            <p>123 Fresh St, Green Valley, 90210</p>
+          </Col>
+          <Col md={3}>
+            <h5>Follow Us</h5>
+            {/* Add social media icons here */}
+          </Col>
+        </Row>
+        <Row>
+          <Col className="text-center mt-3">
+            <p>&copy; {new Date().getFullYear()} LiveMart. All rights reserved.</p>
+          </Col>
+        </Row>
+      </Container>
+    </footer>
+  );
+}
+
 
 function App() {
   // const auth = getAuth(app); // No longer needed
   // const db = getFirestore(app); // No longer needed
 
+  // --- THIS IS THE FIX ---
+  // The error log was right. These lines were broken.
+  // Here are the correct, complete lines.
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  // -------------------------
 
   useEffect(() => {
     // 'auth' and 'db' are now the direct imports
@@ -46,7 +95,10 @@ function App() {
         try {
           const userDoc = await getDoc(doc(db, "users", currentUser.uid));
           if (userDoc.exists()) {
-            setRole(userDoc.data().role);
+            // --- THIS IS THE REAL FIX ---
+            // We trim whitespace AND force to lowercase
+            setRole(userDoc.data().role.trim().toLowerCase());
+            // --------------------------
           } else {
             setRole("customer"); // default fallback
           }
@@ -69,10 +121,14 @@ function App() {
 
   return (
     <Router>
-      {/* ✅ Navigation Bar */}
-      <Navbar bg="light" expand="lg" sticky="top">
+      {/* ✅ UPGRADED Navigation Bar */}
+      <Navbar bg="light" expand="lg" className="shadow-sm sticky-top"> {/* <-- ADDED SHADOW */}
         <Container>
-          <Navbar.Brand as={Link} to="/">LiveMart</Navbar.Brand>
+          {/* --- UPGRADED BRAND --- */}
+          <Navbar.Brand as={Link} to="/" className="fw-bold text-success">
+            <Shop size={30} className="me-2" />
+            LiveMart
+          </Navbar.Brand>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="me-auto">
@@ -87,25 +143,26 @@ function App() {
                 </>
               )}
 
-              {/* ✅ Role-based Dashboards */}
-              {user && role === "Customer" && ( // Fixed logic to check role
+              {/* ✅ Role-based Dashboards (Your logic is good) */}
+              {user && role === "customer" && (
                 <Nav.Link as={Link} to="/customer-dashboard">Customer Dashboard</Nav.Link>
               )}
-              {user && role === "Retailer" && ( // Fixed logic to check role
+              {user && role === "retailer" && (
                 <Nav.Link as={Link} to="/retailer-dashboard">Retailer Dashboard</Nav.Link>
               )}
-              {user && role === "Wholesaler" && ( // Fixed logic to check role
+              {user && role === "wholesaler" && (
                 <Nav.Link as={Link} to="/wholesaler-dashboard">Wholesaler Dashboard</Nav.Link>
               )}
             </Nav>
 
+            {/* --- UPGRADED AUTH BUTTONS --- */}
             <Nav>
               {!user ? (
                 <>
-                  <Nav.Link as={Link} to="/login">Login</Nav.Link>
-                  <Nav.Link as={Link} to="/signup" className="btn btn-primary text-dark">
+                  <Nav.Link as={Link} to="/login" className="me-2">Login</Nav.Link>
+                  <Button as={Link} to="/signup" variant="primary">
                     Signup
-                  </Nav.Link>
+                  </Button>
                 </>
               ) : (
                 <Nav.Link onClick={handleLogout}>Logout</Nav.Link>
@@ -115,42 +172,46 @@ function App() {
         </Container>
       </Navbar>
 
-      {/* ✅ Routes */}
-      <div className="container mt-4">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
-          <Route path="/my-orders" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login />} />
+      {/* ✅ KEY CHANGE: We remove the <div className="container mt-4"> 
+        This lets your page components (like Home.js) control their 
+        own layout, allowing for full-width sections.
+      */}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
+        <Route path="/my-orders" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
 
-          {/* ✅ Role-protected Dashboards */}
-          <Route path="/customer-dashboard" element={
-            <ProtectedRoute allowedRole="customer" userRole={role}>
-              <CustomerDashboard />
-            </ProtectedRoute>
-          } />
+        {/* ✅ Role-protected Dashboards */}
+        <Route path="/customer-dashboard" element={
+          <ProtectedRoute allowedRole="customer" userRole={role}>
+            <CustomerDashboard />
+          </ProtectedRoute>
+        } />
 
-          <Route path="/retailer-dashboard" element={
-            <ProtectedRoute allowedRole="retailer" userRole={role}>
-              <RetailerDashboard />
-            </ProtectedRoute>
-          } />
+        <Route path="/retailer-dashboard" element={
+          <ProtectedRoute allowedRole="retailer" userRole={role}>
+            <RetailerDashboard />
+          </ProtectedRoute>
+        } />
 
-          <Route path="/wholesaler-dashboard" element={
-            <ProtectedRoute allowedRole="wholesaler" userRole={role}>
-              <WholesalerDashboard />
-            </ProtectedRoute>
-          } />
-          
-          {/* You were missing these routes from your *new* file */}
-          <Route path="/add-product" element={<ProtectedRoute allowedRole="retailer" userRole={role}><ProductForm /></ProtectedRoute>} />
-          <Route path="/edit-product/:productId" element={<ProtectedRoute allowedRole="retailer" userRole={role}><ProductForm /></ProtectedRoute>} />
+        <Route path="/wholesaler-dashboard" element={
+          <ProtectedRoute allowedRole="wholesaler" userRole={role}>
+            <WholesalerDashboard />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/add-product" element={<ProtectedRoute allowedRole="retailer" userRole={role}><ProductForm /></ProtectedRoute>} />
+        <Route path="/edit-product/:productId" element={<ProtectedRoute allowedRole="retailer" userRole={role}><ProductForm /></ProtectedRoute>} />
 
-        </Routes>
-      </div>
+      </Routes>
+      
+      {/* --- ADDED FOOTER --- */}
+      <AppFooter />
+      
     </Router>
   );
 }
