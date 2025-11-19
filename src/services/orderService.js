@@ -16,9 +16,11 @@ import { httpsCallable } from "firebase/functions";
 /**
  * (Customer) Calls the 'placeOrder' Cloud Function.
  * This is the ONLY way to create an order.
- * @param {object} orderDetails - { cart, deliveryAddress, paymentMode }
+ * * NEW LOGIC: This function no longer accepts a 'cart' object.
+ * The Cloud Function will read the user's cart directly from the database
+ * at /users/{userId}/cart.
+ * * @param {object} orderDetails - { deliveryAddress, paymentMode }
  */
-// 2. This now correctly points to your deployed Cloud Function
 export const placeOrder = httpsCallable(functions, 'placeOrder');
 
 /**
