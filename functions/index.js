@@ -1,4 +1,4 @@
-// This is your BACKEND file: live-mart/functions/index.js
+// live-mart/functions/index.js
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
@@ -12,8 +12,13 @@ const db = getFirestore();
 // Set global options (e.g., region)
 setGlobalOptions({ region: "us-central1" });
 
+/**
+ * Cloud Function: placeOrder
+ * Reads cart from Firestore, supports proxy/backorder items,
+ * creates an order, and triggers a confirmation email.
+ */
 exports.placeOrder = onCall(async (request) => {
-  // 1. Check for authentication
+  // 1. Authentication check
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -22,10 +27,9 @@ exports.placeOrder = onCall(async (request) => {
   }
 
   const userId = request.auth.uid;
-  // --- NEW LOGIC: Only get address/payment from request ---
   const { deliveryAddress, paymentMode } = request.data; 
 
-  // Get the user's cart subcollection from the DATABASE
+  // 2. Read user's cart from Firestore
   const cartRef = db.collection("users").doc(userId).collection("cart");
   const cartSnapshot = await cartRef.get();
 
@@ -35,18 +39,17 @@ exports.placeOrder = onCall(async (request) => {
 
   try {
     let totalAmount = 0;
-    const productRefs = []; // To store product doc references
-    const cartItemsToDelete = []; // To store cart doc refs to delete later
-    const productDataForOrder = []; // To store clean data for the order document
+    const productRefs = [];
+    const cartItemsToDelete = [];
+    const productDataForOrder = [];
 
-    // 2. Loop through database cart items
+    // 3. Process each cart item
     for (const cartDoc of cartSnapshot.docs) {
       const cartItem = cartDoc.data();
-      const productId = cartDoc.id; // The doc ID is the product ID
+      const productId = cartDoc.id;
       const quantity = cartItem.quantity;
-      const isProxy = cartItem.isProxy || false; // Check for proxy flag
+      const isProxy = cartItem.isProxy || false;
 
-      // Get real product data from Firestore
       const productRef = db.collection("products").doc(productId);
       const doc = await productRef.get();
 
@@ -55,60 +58,79 @@ exports.placeOrder = onCall(async (request) => {
       }
 
       const product = doc.data();
-      
-      // Check stock
+
+      // Stock check & backorder logic
       let isBackorder = false;
       if (product.stock < quantity) {
         if (isProxy) {
-           // Allow if proxy
-           isBackorder = true;
+          isBackorder = true; // Allow backorder for proxy items
         } else {
-           throw new HttpsError(
+          throw new HttpsError(
             "failed-precondition",
             `Not enough stock for ${product.name}.`
           );
         }
       }
-      
-      // Calculate total securely on the server
-      totalAmount += product.price * quantity;
-      
-      productRefs.push(productRef);
-      cartItemsToDelete.push(cartDoc.ref); // Add cart item ref to delete list
 
-      productDataForOrder.push({ 
-        productId: productId,
-        quantity: quantity,
-        name: product.name, 
+      totalAmount += product.price * quantity;
+      productRefs.push(productRef);
+      cartItemsToDelete.push(cartDoc.ref);
+
+      productDataForOrder.push({
+        productId,
+        quantity,
+        name: product.name,
         price: product.price,
-        isBackorder: isBackorder
+        isBackorder,
+        isProxy
       });
     }
 
-    // 3. Run a transaction
+    // 4. Run transaction (Stock update + Order Creation + Email Trigger + Cart Clear)
     const orderRef = await db.runTransaction(async (transaction) => {
-      // A. Update stock for all products
-      // We loop through our arrays which are in sync
+      // A. Update stock
       for (let i = 0; i < productRefs.length; i++) {
         const productRef = productRefs[i];
         const qty = productDataForOrder[i].quantity;
-        const newStock = FieldValue.increment(-qty); 
-        transaction.update(productRef, { stock: newStock });
+        transaction.update(productRef, { stock: FieldValue.increment(-qty) });
       }
 
-      // B. Create the new order document
+      // B. Create order document
       const newOrderRef = db.collection("orders").doc();
       transaction.set(newOrderRef, {
-        userId: userId,
+        userId,
         products: productDataForOrder,
-        totalAmount: totalAmount,
+        totalAmount,
         status: "Pending",
-        deliveryAddress: deliveryAddress,
-        paymentMode: paymentMode,
+        deliveryAddress,
+        paymentMode,
         createdAt: FieldValue.serverTimestamp(),
       });
 
-      // C. Delete the items from the user's cart
+      // --- NEW CODE: EMAIL TRIGGER ---
+      
+      // C. Create the email document for the extension to read
+      const userEmail = request.auth.token.email; 
+      // Fallback to email if name is missing
+      const userName = request.auth.token.name || userEmail || "Customer"; 
+
+      if (userEmail) {
+        const emailRef = db.collection("mail").doc(); 
+        transaction.set(emailRef, {
+          to: [userEmail],
+          template: {
+            name: "orderConfirmation", // Ensure this template exists in your collection
+            data: {
+              orderId: newOrderRef.id,
+              totalAmount: totalAmount.toFixed(2),
+              name: userName,
+            }
+          }
+        });
+      }
+      // --- END NEW CODE ---
+
+      // D. Clear cart
       for (const itemRef of cartItemsToDelete) {
         transaction.delete(itemRef);
       }
@@ -116,7 +138,6 @@ exports.placeOrder = onCall(async (request) => {
       return newOrderRef;
     });
 
-    // 4. Return success
     return { success: true, orderId: orderRef.id };
 
   } catch (error) {
