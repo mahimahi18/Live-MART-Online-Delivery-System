@@ -1,79 +1,133 @@
 import { 
-  getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, query, where, serverTimestamp 
+  collection,
+  addDoc,
+  getDocs,
+  getDoc,
+  doc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  serverTimestamp
 } from "firebase/firestore";
-// --- FIX START ---
-// Import the pre-initialized db and auth from firebase.js
+
 import { db, auth } from "../firebase"; 
-// We no longer need 'app' or 'getAuth' or 'getFirestore' here
-// --- FIX END ---
 
 
-// const db = getFirestore(app); // No longer needed
-// const auth = getAuth(app); // No longer needed
-
-// ✅ Get all products (used in Products page)
+// ----------------------------------------------------
+// ✅ Get ALL products
+// ----------------------------------------------------
 export const getAllProducts = async () => {
   const querySnapshot = await getDocs(collection(db, "products"));
-  return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  return querySnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
 
-// ✅ Get a product by ID (used in ProductForm editing)
+
+// ----------------------------------------------------
+// ✅ Get product by ID
+// ----------------------------------------------------
 export const getProductById = async (productId) => {
   const docRef = doc(db, "products", productId);
-  const productSnap = await getDoc(docRef);
-  if (productSnap.exists()) {
-    return { id: productSnap.id, ...productSnap.data() };
-  } else {
-    throw new Error("Product not found");
-  }
+  const snap = await getDoc(docRef);
+
+  if (!snap.exists()) throw new Error("Product not found");
+
+  return { id: snap.id, ...snap.data() };
 };
 
-// ✅ Add a new product (used in ProductForm)
+
+// ----------------------------------------------------
+// ✅ ADD new product (with proxy, lat, lng)
+// ----------------------------------------------------
 export const addProduct = async (productData) => {
-  const user = auth.currentUser; // 'auth' is now the direct import
+  const user = auth.currentUser;
   if (!user) throw new Error("User not authenticated");
-  
-  // Note: Your old code used 'retailerId', but your new
-  // Cloud Function logic uses 'ownerId'. Let's use 'ownerId'
-  // to be consistent with your secure backend.
-  // We also get the user's role from their profile.
-  // This function should really get the role from the 'users' doc.
-  // For now, let's keep your logic, but 'ownerId' is better.
-  const docRef = await addDoc(collection(db, "products"), {
+
+  const finalData = {
     ...productData,
-    ownerId: user.uid, // Changed to 'ownerId' for consistency
-    // ownerRole: "Retailer", // You should fetch this!
-    createdAt: serverTimestamp(), // Use serverTimestamp
-  });
+
+    // New schema fields
+    ownerId: user.uid,
+    ownerRole: "Retailer",        // you can update later if you store role in user doc
+    createdAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(collection(db, "products"), finalData);
   return docRef.id;
 };
 
-// ✅ Update existing product (used in ProductForm edit mode)
+
+// ----------------------------------------------------
+// ✅ UPDATE existing product
+// ----------------------------------------------------
 export const updateProduct = async (productId, updatedData) => {
   const docRef = doc(db, "products", productId);
+
   await updateDoc(docRef, {
     ...updatedData,
-    updatedAt: serverTimestamp() // Add this for consistency
+    updatedAt: serverTimestamp(),
   });
 };
 
-// ✅ Delete a product (used in RetailerDashboard)
+
+// ----------------------------------------------------
+// ✅ DELETE product
+// ----------------------------------------------------
 export const deleteProduct = async (productId) => {
-  const docRef = doc(db, "products", productId);
-  await deleteDoc(docRef);
+  await deleteDoc(doc(db, "products", productId));
 };
 
+
+// ----------------------------------------------------
 // ✅ Get products belonging to current retailer
+// ----------------------------------------------------
 export const getMyProducts = async () => {
-  const user = auth.currentUser; // 'auth' is now the direct import
-  if (!user) throw new Error("User not authenticated");
+  const user = auth.currentUser;
+  if (!user) throw new Error("User not logged in");
 
-  // Use 'ownerId' to match the field name in your Cloud Function
-  const q = query(collection(db, "products"), where("ownerId", "==", user.uid)); 
-  const querySnapshot = await getDocs(q);
+  const q = query(collection(db, "products"), where("ownerId", "==", user.uid));
+  const snap = await getDocs(q);
 
-  return querySnapshot.docs.map((doc) => ({
+  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+};
+
+
+// ----------------------------------------------------
+// ✅ Get products NEAR user (lat/lng + radius)
+// ----------------------------------------------------
+export const getProductsNearMe = async (center, radiusKm) => {
+  const [userLat, userLng] = center;
+
+  const querySnapshot = await getDocs(collection(db, "products"));
+  const allProducts = querySnapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   }));
+
+  // Filter only those with coordinates
+  const withLocation = allProducts.filter(p => p.lat && p.lng);
+
+  // Haversine distance function
+  const toRad = (deg) => (deg * Math.PI) / 180;
+
+  const distance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // km
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lon2 - lon1);
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLng / 2) ** 2;
+
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  // Only return products within radius
+  return withLocation.filter((prod) => {
+    const d = distance(userLat, userLng, prod.lat, prod.lng);
+    return d <= radiusKm;
+  });
 };
+

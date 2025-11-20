@@ -1,13 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { addProduct, getProductById, updateProduct } from '../services/productService';
-import './ProductForm.css'; // We'll create this file
+import './ProductForm.css';
 
 function ProductForm() {
-  // Get 'productId' from the URL (e.g., /edit-product/abc123)
-  // If it's undefined, we are in "Add" mode.
   const { productId } = useParams();
   const navigate = useNavigate();
   const auth = getAuth();
@@ -19,10 +16,14 @@ function ProductForm() {
   const [imageURL, setImageURL] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Check if we are in "Edit" mode
+  // ⭐ NEW STATE FIELDS
+  const [isProxy, setIsProxy] = useState(false);
+  const [lat, setLat] = useState('');
+  const [lng, setLng] = useState('');
+
+  // Load data when editing
   useEffect(() => {
     if (productId) {
-      console.log("Edit mode: fetching product", productId);
       const fetchProduct = async () => {
         const product = await getProductById(productId);
         if (product) {
@@ -30,12 +31,17 @@ function ProductForm() {
           setCategory(product.category);
           setPrice(product.price);
           setStock(product.stock);
-          setImageURL(product.imageURL);
+          setImageURL(product.imageURL || '');
+
+          // ⭐ Load new fields if they exist
+          setIsProxy(product.isProxy || false);
+          setLat(product.lat || '');
+          setLng(product.lng || '');
         }
       };
       fetchProduct();
     }
-  }, [productId]); // Re-run if productId changes
+  }, [productId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -48,24 +54,31 @@ function ProductForm() {
       return;
     }
 
-    const productData = { name, category, price: Number(price), stock: Number(stock), imageURL };
+    // ⭐ Include new fields in product data
+    const productData = {
+      name,
+      category,
+      price: Number(price),
+      stock: Number(stock),
+      imageURL,
+      isProxy,
+      lat: lat === '' ? null : Number(lat),
+      lng: lng === '' ? null : Number(lng),
+    };
 
     try {
       if (productId) {
-        // --- UPDATE (EDIT) LOGIC ---
-        console.log("Updating product...");
+        // UPDATE EXISTING PRODUCT
         await updateProduct(productId, productData);
         alert("Product updated successfully!");
       } else {
-        // --- ADD NEW LOGIC ---
-        console.log("Adding new product...");
-        // This assumes the user's role is stored in their Auth token or you fetch it
-        // For now, we'll hardcode the role or get it from a user profile
-        // Let's assume the user is a Retailer for this test
-        await addProduct(productData, user.uid, "Retailer"); 
+        // ADD NEW PRODUCT
+        await addProduct(productData, user.uid, "Retailer");
         alert("Product added successfully!");
       }
-      navigate('/retailer-dashboard'); // Go back to dashboard on success
+
+      navigate('/retailer-dashboard');
+
     } catch (error) {
       console.error("Error saving product:", error);
       alert("Failed to save product: " + error.message);
@@ -80,19 +93,70 @@ function ProductForm() {
         <h1>{productId ? "Edit Product" : "Add New Product"}</h1>
 
         <label>Product Name</label>
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
+        <input 
+          type="text" 
+          value={name} 
+          onChange={(e) => setName(e.target.value)} 
+          required 
+        />
 
         <label>Category</label>
-        <input type="text" value={category} onChange={(e) => setCategory(e.target.value)} required />
+        <input 
+          type="text" 
+          value={category} 
+          onChange={(e) => setCategory(e.target.value)} 
+          required 
+        />
 
         <label>Price</label>
-        <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} required />
+        <input 
+          type="number" 
+          value={price} 
+          onChange={(e) => setPrice(e.target.value)} 
+          required 
+        />
 
         <label>Stock</label>
-        <input type="number" value={stock} onChange={(e) => setStock(e.target.value)} required />
+        <input 
+          type="number" 
+          value={stock} 
+          onChange={(e) => setStock(e.target.value)} 
+          required 
+        />
 
         <label>Image URL</label>
-        <input type="text" value={imageURL} onChange={(e) => setImageURL(e.target.value)} />
+        <input 
+          type="text" 
+          value={imageURL} 
+          onChange={(e) => setImageURL(e.target.value)} 
+        />
+
+        {/* ⭐ NEW FIELD — isProxy checkbox */}
+        <label>
+          <input 
+            type="checkbox" 
+            checked={isProxy} 
+            onChange={(e) => setIsProxy(e.target.checked)} 
+          />
+          &nbsp;Is Proxy Product
+        </label>
+
+        {/* ⭐ NEW FIELDS — lat & lng */}
+        <label>Latitude</label>
+        <input
+          type="number"
+          step="0.000001"
+          value={lat}
+          onChange={(e) => setLat(e.target.value)}
+        />
+
+        <label>Longitude</label>
+        <input
+          type="number"
+          step="0.000001"
+          value={lng}
+          onChange={(e) => setLng(e.target.value)}
+        />
 
         <button type="submit" disabled={loading}>
           {loading ? "Saving..." : "Save Product"}
@@ -103,3 +167,4 @@ function ProductForm() {
 }
 
 export default ProductForm;
+

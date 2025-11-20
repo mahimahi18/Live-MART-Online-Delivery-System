@@ -16,24 +16,24 @@ import WholesalerDashboard from "./pages/WholesalerDashboard";
 import Profile from "./pages/Profile";
 import MyOrders from "./pages/MyOrders";
 import ProductForm from "./pages/ProductForm";
-import Checkout from "./pages/Checkout"; // <--- NEW IMPORT
+import Checkout from "./pages/Checkout";
 
-// React-Bootstrap imports
-import Container from 'react-bootstrap/Container';
-import Nav from 'react-bootstrap/Nav';
-import Navbar from 'react-bootstrap/Navbar';
-import Button from 'react-bootstrap/Button';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
+// ⭐ NEW PAGE IMPORT
+import ShopsNearMe from "./pages/ShopsNearMe";
+
+import Container from "react-bootstrap/Container";
+import Nav from "react-bootstrap/Nav";
+import Navbar from "react-bootstrap/Navbar";
+import Button from "react-bootstrap/Button";
+import Row from "react-bootstrap/Row";
+import Col from "react-bootstrap/Col";
+
 import ProtectedRoute from "./components/ProtectedRoute"; 
+import { Shop } from "react-bootstrap-icons";
 
-// Icon import
-import { Shop } from 'react-bootstrap-icons';
+import "bootstrap/dist/css/bootstrap.min.css";
+import "./App.css";
 
-import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css';
-
-// --- FOOTER COMPONENT ---
 function AppFooter() {
   return (
     <footer className="py-4 mt-5 bg-dark text-white">
@@ -56,7 +56,6 @@ function AppFooter() {
           </Col>
           <Col md={3}>
             <h5>Follow Us</h5>
-            {/* Add social media icons here */}
           </Col>
         </Row>
         <Row>
@@ -81,10 +80,9 @@ function App() {
         try {
           const userDoc = await getDoc(doc(db, "users", currentUser.uid));
           if (userDoc.exists()) {
-            // We trim whitespace AND force to lowercase to prevent auth bugs
             setRole(userDoc.data().role.trim().toLowerCase());
           } else {
-            setRole("customer"); // default fallback
+            setRole("customer");
           }
         } catch (err) {
           console.error("Error fetching role:", err);
@@ -105,18 +103,21 @@ function App() {
 
   return (
     <Router>
-      {/* Navigation Bar */}
       <Navbar bg="light" expand="lg" className="shadow-sm sticky-top">
         <Container>
           <Navbar.Brand as={Link} to="/" className="fw-bold text-success">
             <Shop size={30} className="me-2" />
             LiveMart
           </Navbar.Brand>
+
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="me-auto">
               <Nav.Link as={Link} to="/">Home</Nav.Link>
               <Nav.Link as={Link} to="/products">Products</Nav.Link>
+
+              {/* ⭐ NEW NAV LINK */}
+              <Nav.Link as={Link} to="/shops-near-me">Shops Near Me</Nav.Link>
 
               {user && (
                 <>
@@ -126,7 +127,6 @@ function App() {
                 </>
               )}
 
-              {/* Role-based Dashboards */}
               {user && role === "customer" && (
                 <Nav.Link as={Link} to="/customer-dashboard">Customer Dashboard</Nav.Link>
               )}
@@ -138,14 +138,11 @@ function App() {
               )}
             </Nav>
 
-            {/* Auth Buttons */}
             <Nav>
               {!user ? (
                 <>
                   <Nav.Link as={Link} to="/login" className="me-2">Login</Nav.Link>
-                  <Button as={Link} to="/signup" variant="primary">
-                    Signup
-                  </Button>
+                  <Button as={Link} to="/signup" variant="primary">Signup</Button>
                 </>
               ) : (
                 <Nav.Link onClick={handleLogout}>Logout</Nav.Link>
@@ -158,16 +155,18 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/products" element={<Products />} />
+
+        {/* ⭐ NEW ROUTE */}
+        <Route path="/shops-near-me" element={<ShopsNearMe />} />
+
         <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
         <Route path="/my-orders" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
-        
-        {/* ✅ NEW ROUTE FOR CHECKOUT */}
+
         <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
 
-        {/* Role-protected Dashboards */}
         <Route path="/customer-dashboard" element={
           <ProtectedRoute allowedRole="customer" userRole={role}>
             <CustomerDashboard />
@@ -185,15 +184,21 @@ function App() {
             <WholesalerDashboard />
           </ProtectedRoute>
         } />
-        
-        {/* Product Management Routes (Retailer) */}
-        <Route path="/add-product" element={<ProtectedRoute allowedRole="retailer" userRole={role}><ProductForm /></ProtectedRoute>} />
-        <Route path="/edit-product/:productId" element={<ProtectedRoute allowedRole="retailer" userRole={role}><ProductForm /></ProtectedRoute>} />
 
+        <Route path="/add-product" element={
+          <ProtectedRoute allowedRole="retailer" userRole={role}>
+            <ProductForm />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/edit-product/:productId" element={
+          <ProtectedRoute allowedRole="retailer" userRole={role}>
+            <ProductForm />
+          </ProtectedRoute>
+        } />
       </Routes>
-      
+
       <AppFooter />
-      
     </Router>
   );
 }
