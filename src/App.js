@@ -1,14 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-// --- FIX START ---
-// We import the pre-initialized auth and db, not app
 import { auth, db } from "./firebase"; 
-// We import the functions we need
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-// --- FIX END ---
 import { useEffect, useState } from "react";
 
-// ✅ Import all pages
+// Import all pages
 import Home from "./pages/Home";
 import Products from "./pages/Products";
 import Cart from "./pages/Cart";
@@ -20,24 +16,24 @@ import WholesalerDashboard from "./pages/WholesalerDashboard";
 import Profile from "./pages/Profile";
 import MyOrders from "./pages/MyOrders";
 import ProductForm from "./pages/ProductForm";
+import Checkout from "./pages/Checkout"; // <--- NEW IMPORT
 
-// ✅ React-Bootstrap imports
+// React-Bootstrap imports
 import Container from 'react-bootstrap/Container';
 import Nav from 'react-bootstrap/Nav';
 import Navbar from 'react-bootstrap/Navbar';
-import Button from 'react-bootstrap/Button'; // <-- IMPORT BUTTON
-import Row from 'react-bootstrap/Row';     // <-- IMPORT ROW
-import Col from 'react-bootstrap/Col';     // <-- IMPORT COL
+import Button from 'react-bootstrap/Button';
+import Row from 'react-bootstrap/Row';
+import Col from 'react-bootstrap/Col';
 import ProtectedRoute from "./components/ProtectedRoute"; 
 
-// ✅ Icon import
-import { Shop } from 'react-bootstrap-icons'; // <-- IMPORT ICON
+// Icon import
+import { Shop } from 'react-bootstrap-icons';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
-// --- NEW FOOTER COMPONENT ---
-// We define the footer here at the top level
+// --- FOOTER COMPONENT ---
 function AppFooter() {
   return (
     <footer className="py-4 mt-5 bg-dark text-white">
@@ -52,7 +48,6 @@ function AppFooter() {
             <ul className="list-unstyled">
               <li><Link to="/" className="text-white text-decoration-none">Home</Link></li>
               <li><Link to="/products" className="text-white text-decoration-none">Products</Link></li>
-              {/* Add more links as needed */}
             </ul>
           </Col>
           <Col md={3}>
@@ -74,31 +69,20 @@ function AppFooter() {
   );
 }
 
-
 function App() {
-  // const auth = getAuth(app); // No longer needed
-  // const db = getFirestore(app); // No longer needed
-
-  // --- THIS IS THE FIX ---
-  // The error log was right. These lines were broken.
-  // Here are the correct, complete lines.
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
-  // -------------------------
 
   useEffect(() => {
-    // 'auth' and 'db' are now the direct imports
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
         try {
           const userDoc = await getDoc(doc(db, "users", currentUser.uid));
           if (userDoc.exists()) {
-            // --- THIS IS THE REAL FIX ---
-            // We trim whitespace AND force to lowercase
+            // We trim whitespace AND force to lowercase to prevent auth bugs
             setRole(userDoc.data().role.trim().toLowerCase());
-            // --------------------------
           } else {
             setRole("customer"); // default fallback
           }
@@ -111,20 +95,19 @@ function App() {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []); // We can remove auth and db from dependencies, as they are stable imports
+  }, []);
 
   const handleLogout = async () => {
-    await signOut(auth); // 'auth' is the direct import
+    await signOut(auth);
   };
 
   if (loading) return <div className="text-center mt-5">Loading...</div>;
 
   return (
     <Router>
-      {/* ✅ UPGRADED Navigation Bar */}
-      <Navbar bg="light" expand="lg" className="shadow-sm sticky-top"> {/* <-- ADDED SHADOW */}
+      {/* Navigation Bar */}
+      <Navbar bg="light" expand="lg" className="shadow-sm sticky-top">
         <Container>
-          {/* --- UPGRADED BRAND --- */}
           <Navbar.Brand as={Link} to="/" className="fw-bold text-success">
             <Shop size={30} className="me-2" />
             LiveMart
@@ -143,7 +126,7 @@ function App() {
                 </>
               )}
 
-              {/* ✅ Role-based Dashboards (Your logic is good) */}
+              {/* Role-based Dashboards */}
               {user && role === "customer" && (
                 <Nav.Link as={Link} to="/customer-dashboard">Customer Dashboard</Nav.Link>
               )}
@@ -155,7 +138,7 @@ function App() {
               )}
             </Nav>
 
-            {/* --- UPGRADED AUTH BUTTONS --- */}
+            {/* Auth Buttons */}
             <Nav>
               {!user ? (
                 <>
@@ -172,10 +155,6 @@ function App() {
         </Container>
       </Navbar>
 
-      {/* ✅ KEY CHANGE: We remove the <div className="container mt-4"> 
-        This lets your page components (like Home.js) control their 
-        own layout, allowing for full-width sections.
-      */}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/products" element={<Products />} />
@@ -184,8 +163,11 @@ function App() {
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
+        
+        {/* ✅ NEW ROUTE FOR CHECKOUT */}
+        <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
 
-        {/* ✅ Role-protected Dashboards */}
+        {/* Role-protected Dashboards */}
         <Route path="/customer-dashboard" element={
           <ProtectedRoute allowedRole="customer" userRole={role}>
             <CustomerDashboard />
@@ -204,12 +186,12 @@ function App() {
           </ProtectedRoute>
         } />
         
+        {/* Product Management Routes (Retailer) */}
         <Route path="/add-product" element={<ProtectedRoute allowedRole="retailer" userRole={role}><ProductForm /></ProtectedRoute>} />
         <Route path="/edit-product/:productId" element={<ProtectedRoute allowedRole="retailer" userRole={role}><ProductForm /></ProtectedRoute>} />
 
       </Routes>
       
-      {/* --- ADDED FOOTER --- */}
       <AppFooter />
       
     </Router>

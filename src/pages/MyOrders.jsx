@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../firebase'; // Import the pre-initialized auth
-import { getMyOrders } from '../services/orderService'; 
-// We won't use MyOrders.css, we'll use Bootstrap components
-// import './MyOrders.css'; 
+import { auth, db } from '../firebase'; 
+import { collection, query, where, onSnapshot } from 'firebase/firestore'; // Direct Firestore imports
+import { useNavigate } from 'react-router-dom'; 
 
-// --- NEW: Import React-Bootstrap Components ---
+// React-Bootstrap Components
 import Container from 'react-bootstrap/Container';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -14,35 +13,45 @@ import Spinner from 'react-bootstrap/Spinner';
 import Stack from 'react-bootstrap/Stack';
 import ListGroup from 'react-bootstrap/ListGroup';
 import Button from 'react-bootstrap/Button';
-import { useNavigate } from 'react-router-dom'; // To redirect
 
 function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate(); // Hook for redirecting
+  const navigate = useNavigate(); 
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
-        console.log("Fetching orders for user:", user.uid);
-        getMyOrders(user.uid)
-          .then(data => {
-            setOrders(data);
-            setLoading(false);
-          })
-          .catch(error => {
-            console.error("Error fetching orders:", error);
-            setLoading(false);
-          });
+        // --- 1. QUERY FIRESTORE FOR ORDERS ---
+        // We want orders where 'userId' matches the current user's ID
+        const ordersRef = collection(db, "orders");
+        const q = query(ordersRef, where("userId", "==", user.uid)); 
+
+        const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+          const ordersData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          // Sort orders by date locally (newest first)
+          // Note: To do this in the query, you need a composite index in Firestore
+          ordersData.sort((a, b) => new Date(b.date) - new Date(a.date));
+          
+          setOrders(ordersData);
+          setLoading(false);
+        }, (error) => {
+          console.error("Error fetching orders:", error);
+          setLoading(false);
+        });
+
+        return () => unsubscribeSnapshot();
       } else {
-        // No user, redirect to login
         setLoading(false);
         navigate('/login');
       }
     });
 
-    return () => unsubscribe();
-  }, [navigate]); // Add navigate to dependency array
+    return () => unsubscribeAuth();
+  }, [navigate]);
 
   // --- THEMED RENDER ---
 
@@ -57,7 +66,7 @@ function MyOrders() {
 
   return (
     <>
-      {/* 1. "Mini-Hero" Section for Theme Consistency */}
+      {/* 1. "Mini-Hero" Section */}
       <Container
         fluid
         className="p-5 mb-5 text-center text-white shadow-lg"
@@ -74,7 +83,6 @@ function MyOrders() {
       {/* 2. Orders Content */}
       <Container className="my-5">
         {orders.length === 0 ? (
-          // --- Themed "No Orders" state ---
           <Row className="justify-content-center">
             <Col md={8}>
               <Card className="border-0 shadow-sm text-center">
@@ -91,7 +99,6 @@ function MyOrders() {
             </Col>
           </Row>
         ) : (
-          // --- Themed Order List ---
           <Stack gap={4}>
             {orders.map(order => (
               <Card key={order.id} className="shadow-sm border-0">
@@ -110,7 +117,7 @@ function MyOrders() {
                     <Col md={8}>
                       <h5 className="fw-bold">Products</h5>
                       <ListGroup variant="flush">
-                        {order.products.map((product, index) => (
+                        {order.products && order.products.map((product, index) => (
                           <ListGroup.Item key={index} className="d-flex justify-content-between">
                             <span>{product.name}</span>
                             <span className="text-muted">Quantity: {product.quantity}</span>
@@ -122,8 +129,12 @@ function MyOrders() {
                       <h5 className="fw-bold">Summary</h5>
                       <Stack gap={2}>
                         <div className="d-flex justify-content-between">
+                          <span className="text-muted">Date:</span>
+                          <span>{order.date}</span>
+                        </div>
+                        <div className="d-flex justify-content-between">
                           <span className="text-muted">Total:</span>
-                          <h5 className="fw-bold text-success mb-0">${order.totalAmount.toFixed(2)}</h5>
+                          <h5 className="fw-bold text-success mb-0">${Number(order.totalAmount).toFixed(2)}</h5>
                         </div>
                         <div className="d-flex justify-content-between">
                           <span className="text-muted">Address:</span>

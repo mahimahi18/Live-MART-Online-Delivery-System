@@ -232,6 +232,7 @@ export default function Cart() {
                     size="lg" 
                     className="w-100 mt-3" 
                     disabled={cartItems.length === 0}
+                    onClick={() => navigate('/checkout')}
                   >
                     Proceed to Checkout
                   </Button>
