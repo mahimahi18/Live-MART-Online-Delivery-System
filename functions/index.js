@@ -1,6 +1,5 @@
-// This is your BACKEND file: live-mart/functions/index.js
+// live-mart/functions/index.js
 
-// Import v2 functions
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { initializeApp } = require("firebase-admin/app");
@@ -14,10 +13,12 @@ const db = getFirestore();
 setGlobalOptions({ region: "us-central1" });
 
 /**
- * A v2 callable Cloud Function to place an order and update stock.
+ * Cloud Function: placeOrder
+ * Reads cart from Firestore, supports proxy/backorder items,
+ * creates an order, and triggers a confirmation email.
  */
 exports.placeOrder = onCall(async (request) => {
-  // 1. Check for authentication
+  // 1. Authentication check
   if (!request.auth) {
     throw new HttpsError(
       "unauthenticated",
@@ -26,83 +27,124 @@ exports.placeOrder = onCall(async (request) => {
   }
 
   const userId = request.auth.uid;
-  // v2 uses request.data
-  const { cart, deliveryAddress, paymentMode } = request.data; 
+  const { deliveryAddress, paymentMode } = request.data; 
 
-  if (!cart || cart.length === 0) {
+  // 2. Read user's cart from Firestore
+  const cartRef = db.collection("users").doc(userId).collection("cart");
+  const cartSnapshot = await cartRef.get();
+
+  if (cartSnapshot.empty) {
     throw new HttpsError("invalid-argument", "Cart is empty.");
   }
 
   try {
     let totalAmount = 0;
-    const productRefs = []; // To store doc references for the transaction
-    const productData = []; // To store clean data for the order document
+    const productRefs = [];
+    const cartItemsToDelete = [];
+    const productDataForOrder = [];
 
-    // 2. Get real product data from Firestore (prevents price tampering)
-    for (const item of cart) {
-      const productRef = db.collection("products").doc(item.productId);
+    // 3. Process each cart item
+    for (const cartDoc of cartSnapshot.docs) {
+      const cartItem = cartDoc.data();
+      const productId = cartDoc.id;
+      const quantity = cartItem.quantity;
+      const isProxy = cartItem.isProxy || false;
+
+      const productRef = db.collection("products").doc(productId);
       const doc = await productRef.get();
 
       if (!doc.exists) {
-        throw new HttpsError("not-found", `Product ${item.productId} not found.`);
+        throw new HttpsError("not-found", `Product ${productId} not found.`);
       }
 
       const product = doc.data();
-      
-      // Check stock
-      if (product.stock < item.quantity) {
-        throw new HttpsError(
-          "failed-precondition",
-          `Not enough stock for ${product.name}.`
-        );
+
+      // Stock check & backorder logic
+      let isBackorder = false;
+      if (product.stock < quantity) {
+        if (isProxy) {
+          isBackorder = true; // Allow backorder for proxy items
+        } else {
+          throw new HttpsError(
+            "failed-precondition",
+            `Not enough stock for ${product.name}.`
+          );
+        }
       }
-      
-      // Calculate total securely on the server
-      totalAmount += product.price * item.quantity;
-      productRefs.push(productRef); // Store ref for transaction
-      productData.push({ 
-        productId: item.productId,
-        quantity: item.quantity,
-        name: product.name, 
-        price: product.price 
-      }); // Store full item data
+
+      totalAmount += product.price * quantity;
+      productRefs.push(productRef);
+      cartItemsToDelete.push(cartDoc.ref);
+
+      productDataForOrder.push({
+        productId,
+        quantity,
+        name: product.name,
+        price: product.price,
+        isBackorder,
+        isProxy
+      });
     }
 
-    // 3. Run a transaction to update stock and create the order
+    // 4. Run transaction (Stock update + Order Creation + Email Trigger + Cart Clear)
     const orderRef = await db.runTransaction(async (transaction) => {
-      // A. Update stock for all products
-      for (let i = 0; i < cart.length; i++) {
-        const productRef = productRefs[i]; // The doc reference
-        // Use v2/admin FieldValue
-        const newStock = FieldValue.increment(-cart[i].quantity); 
-        transaction.update(productRef, { stock: newStock });
+      // A. Update stock
+      for (let i = 0; i < productRefs.length; i++) {
+        const productRef = productRefs[i];
+        const qty = productDataForOrder[i].quantity;
+        transaction.update(productRef, { stock: FieldValue.increment(-qty) });
       }
 
-      // B. Create the new order document
-      const newOrderRef = db.collection("orders").doc(); // Auto-generate an ID
+      // B. Create order document
+      const newOrderRef = db.collection("orders").doc();
       transaction.set(newOrderRef, {
-        userId: userId,
-        products: productData, // The array of {productId, quantity, name, price}
-        totalAmount: totalAmount,
+        userId,
+        products: productDataForOrder,
+        totalAmount,
         status: "Pending",
-        deliveryAddress: deliveryAddress,
-        paymentMode: paymentMode,
-        createdAt: FieldValue.serverTimestamp(), // Use v2/admin FieldValue
+        deliveryAddress,
+        paymentMode,
+        createdAt: FieldValue.serverTimestamp(),
       });
 
-      return newOrderRef; // Return the new order's ref
+      // --- NEW CODE: EMAIL TRIGGER ---
+      
+      // C. Create the email document for the extension to read
+      const userEmail = request.auth.token.email; 
+      // Fallback to email if name is missing
+      const userName = request.auth.token.name || userEmail || "Customer"; 
+
+      if (userEmail) {
+        const emailRef = db.collection("mail").doc(); 
+        transaction.set(emailRef, {
+          to: [userEmail],
+          template: {
+            name: "orderConfirmation", // Ensure this template exists in your collection
+            data: {
+              orderId: newOrderRef.id,
+              totalAmount: totalAmount.toFixed(2),
+              name: userName,
+            }
+          }
+        });
+      }
+      // --- END NEW CODE ---
+
+      // D. Clear cart
+      for (const itemRef of cartItemsToDelete) {
+        transaction.delete(itemRef);
+      }
+
+      return newOrderRef;
     });
 
-    // 4. Return success to the client
     return { success: true, orderId: orderRef.id };
 
   } catch (error) {
     console.error("Transaction failed: ", error);
     if (error instanceof HttpsError) {
-      throw error; // Re-throw HttpsError so client sees it
+      throw error;
     }
-    // Throw a generic error for anything else
     throw new HttpsError("unknown", error.message, error);
   }
 });
-

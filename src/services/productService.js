@@ -130,4 +130,3 @@ export const getProductsNearMe = async (center, radiusKm) => {
     return d <= radiusKm;
   });
 };
-
