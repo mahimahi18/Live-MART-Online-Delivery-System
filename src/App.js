@@ -18,7 +18,10 @@ import MyOrders from "./pages/MyOrders";
 import ProductForm from "./pages/ProductForm";
 import Checkout from "./pages/Checkout";
 
-// ⭐ NEW PAGE IMPORT
+// ⭐ Phone Login Import
+import LoginWithPhone from "./pages/LoginWithPhone"; 
+
+// ⭐ Shops Near Me (Active)
 import ShopsNearMe from "./pages/ShopsNearMe";
 
 import Container from "react-bootstrap/Container";
@@ -80,6 +83,7 @@ function App() {
         try {
           const userDoc = await getDoc(doc(db, "users", currentUser.uid));
           if (userDoc.exists()) {
+            // Important fix for role matching
             setRole(userDoc.data().role.trim().toLowerCase());
           } else {
             setRole("customer");
@@ -116,7 +120,7 @@ function App() {
               <Nav.Link as={Link} to="/">Home</Nav.Link>
               <Nav.Link as={Link} to="/products">Products</Nav.Link>
 
-              {/* ⭐ NEW NAV LINK */}
+              {/* ⭐ Shops Near Me Link */}
               <Nav.Link as={Link} to="/shops-near-me">Shops Near Me</Nav.Link>
 
               {user && (
@@ -141,6 +145,9 @@ function App() {
             <Nav>
               {!user ? (
                 <>
+                  {/* ⭐ ADDED: Phone Login Link in Navbar */}
+                  <Nav.Link as={Link} to="/login-phone" className="me-2">Phone Login</Nav.Link>
+                  
                   <Nav.Link as={Link} to="/login" className="me-2">Login</Nav.Link>
                   <Button as={Link} to="/signup" variant="primary">Signup</Button>
                 </>
@@ -156,7 +163,10 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/products" element={<Products />} />
 
-        {/* ⭐ NEW ROUTE */}
+        {/* ⭐ Phone Login Route */}
+        <Route path="/login-phone" element={<LoginWithPhone />} />
+
+        {/* ⭐ Shops Near Me Route */}
         <Route path="/shops-near-me" element={<ShopsNearMe />} />
 
         <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
