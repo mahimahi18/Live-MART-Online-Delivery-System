@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
-import { getProductsNearMe } from './services/productService';
+import { getProductsNearMe } from '../services/productService';
 import Container from 'react-bootstrap/Container';
 import Form from 'react-bootstrap/Form';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
 import Card from 'react-bootstrap/Card';
+
 
 const containerStyle = {
   width: '100%',
