@@ -4,7 +4,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 
-// Import all pages
+// Import all existing pages
 import Home from "./pages/Home";
 import Products from "./pages/Products";
 import Cart from "./pages/Cart";
@@ -24,9 +24,21 @@ import LoginWithPhone from "./pages/LoginWithPhone";
 // ⭐ Shops Near Me (Active)
 import ShopsNearMe from "./pages/ShopsNearMe";
 
+// ⭐ NEW RETAILER PAGES
+import RetailerInventory from "./pages/RetailerInventory";
+import RetailerSalesHistory from "./pages/RetailerSalesHistory";
+import WholesaleMarket from "./pages/WholesaleMarket";
+import RetailerOrders from "./pages/RetailerOrders";
+
+// ⭐ NEW WHOLESALER PAGES
+import WholesalerInventory from "./pages/WholesalerInventory";
+import WholesalerIncomingOrders from "./pages/WholesalerIncomingOrders";
+import WholesalerTransactionHistory from "./pages/WholesalerTransactionHistory";
+
 import Container from "react-bootstrap/Container";
 import Nav from "react-bootstrap/Nav";
 import Navbar from "react-bootstrap/Navbar";
+import NavDropdown from "react-bootstrap/NavDropdown"; 
 import Button from "react-bootstrap/Button";
 import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
@@ -83,7 +95,6 @@ function App() {
         try {
           const userDoc = await getDoc(doc(db, "users", currentUser.uid));
           if (userDoc.exists()) {
-            // Important fix for role matching
             setRole(userDoc.data().role.trim().toLowerCase());
           } else {
             setRole("customer");
@@ -119,35 +130,49 @@ function App() {
             <Nav className="me-auto">
               <Nav.Link as={Link} to="/">Home</Nav.Link>
               <Nav.Link as={Link} to="/products">Products</Nav.Link>
-
-              {/* ⭐ Shops Near Me Link */}
               <Nav.Link as={Link} to="/shops-near-me">Shops Near Me</Nav.Link>
 
-              {user && (
+              {/* ⭐ CUSTOMER SPECIFIC LINKS (Hidden for Retailers/Wholesalers) */}
+              {user && role === "customer" && (
                 <>
                   <Nav.Link as={Link} to="/cart">Cart</Nav.Link>
                   <Nav.Link as={Link} to="/my-orders">My Orders</Nav.Link>
-                  <Nav.Link as={Link} to="/profile">Profile</Nav.Link>
+                  <Nav.Link as={Link} to="/customer-dashboard">Dashboard</Nav.Link>
                 </>
               )}
 
-              {user && role === "customer" && (
-                <Nav.Link as={Link} to="/customer-dashboard">Customer Dashboard</Nav.Link>
-              )}
+              {/* ⭐ RETAILER SPECIFIC LINKS (Hidden for Customers/Wholesalers) */}
               {user && role === "retailer" && (
-                <Nav.Link as={Link} to="/retailer-dashboard">Retailer Dashboard</Nav.Link>
+                <NavDropdown title="Retailer Menu" id="retailer-nav-dropdown">
+                  <NavDropdown.Item as={Link} to="/retailer-dashboard">Dashboard</NavDropdown.Item>
+                  <NavDropdown.Item as={Link} to="/retailer-inventory">Inventory</NavDropdown.Item>
+                  <NavDropdown.Item as={Link} to="/retailer-sales">Sales History</NavDropdown.Item>
+                  <NavDropdown.Divider />
+                  <NavDropdown.Item as={Link} to="/wholesale-market">Buy Stock</NavDropdown.Item>
+                  <NavDropdown.Item as={Link} to="/retailer-orders">My Wholesale Orders</NavDropdown.Item>
+                </NavDropdown>
               )}
+
+              {/* ⭐ WHOLESALER SPECIFIC LINKS (Hidden for Customers/Retailers) */}
               {user && role === "wholesaler" && (
-                <Nav.Link as={Link} to="/wholesaler-dashboard">Wholesaler Dashboard</Nav.Link>
+                <NavDropdown title="Wholesaler Menu" id="wholesaler-nav-dropdown">
+                  <NavDropdown.Item as={Link} to="/wholesaler-dashboard">Dashboard</NavDropdown.Item>
+                  <NavDropdown.Item as={Link} to="/wholesaler-inventory">Inventory</NavDropdown.Item>
+                  <NavDropdown.Item as={Link} to="/wholesaler-incoming-orders">Incoming Orders</NavDropdown.Item>
+                  <NavDropdown.Item as={Link} to="/wholesaler-history">Transaction History</NavDropdown.Item>
+                </NavDropdown>
+              )}
+
+              {/* ⭐ COMMON LINKS (Visible to ALL logged in users) */}
+              {user && (
+                <Nav.Link as={Link} to="/profile">Profile</Nav.Link>
               )}
             </Nav>
 
             <Nav>
               {!user ? (
                 <>
-                  {/* ⭐ ADDED: Phone Login Link in Navbar */}
                   <Nav.Link as={Link} to="/login-phone" className="me-2">Phone Login</Nav.Link>
-                  
                   <Nav.Link as={Link} to="/login" className="me-2">Login</Nav.Link>
                   <Button as={Link} to="/signup" variant="primary">Signup</Button>
                 </>
@@ -162,50 +187,83 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/products" element={<Products />} />
-
-        {/* ⭐ Phone Login Route */}
         <Route path="/login-phone" element={<LoginWithPhone />} />
-
-        {/* ⭐ Shops Near Me Route */}
         <Route path="/shops-near-me" element={<ShopsNearMe />} />
-
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
+        
+        {/* Protected Routes - Role logic handled inside ProtectedRoute */}
         <Route path="/cart" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
         <Route path="/my-orders" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/login" element={<Login />} />
-
         <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
 
+        {/* --- CUSTOMER ROUTES --- */}
         <Route path="/customer-dashboard" element={
           <ProtectedRoute allowedRole="customer" userRole={role}>
             <CustomerDashboard />
           </ProtectedRoute>
         } />
 
+        {/* --- RETAILER ROUTES --- */}
         <Route path="/retailer-dashboard" element={
           <ProtectedRoute allowedRole="retailer" userRole={role}>
             <RetailerDashboard />
           </ProtectedRoute>
         } />
-
-        <Route path="/wholesaler-dashboard" element={
-          <ProtectedRoute allowedRole="wholesaler" userRole={role}>
-            <WholesalerDashboard />
+        <Route path="/retailer-inventory" element={
+          <ProtectedRoute allowedRole="retailer" userRole={role}>
+            <RetailerInventory />
           </ProtectedRoute>
         } />
-
+        <Route path="/retailer-sales" element={
+          <ProtectedRoute allowedRole="retailer" userRole={role}>
+            <RetailerSalesHistory />
+          </ProtectedRoute>
+        } />
+        <Route path="/wholesale-market" element={
+          <ProtectedRoute allowedRole="retailer" userRole={role}>
+            <WholesaleMarket />
+          </ProtectedRoute>
+        } />
+        <Route path="/retailer-orders" element={
+          <ProtectedRoute allowedRole="retailer" userRole={role}>
+            <RetailerOrders />
+          </ProtectedRoute>
+        } />
         <Route path="/add-product" element={
           <ProtectedRoute allowedRole="retailer" userRole={role}>
             <ProductForm />
           </ProtectedRoute>
         } />
-
         <Route path="/edit-product/:productId" element={
           <ProtectedRoute allowedRole="retailer" userRole={role}>
             <ProductForm />
           </ProtectedRoute>
         } />
+
+        {/* --- WHOLESALER ROUTES --- */}
+        <Route path="/wholesaler-dashboard" element={
+          <ProtectedRoute allowedRole="wholesaler" userRole={role}>
+            <WholesalerDashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/wholesaler-inventory" element={
+          <ProtectedRoute allowedRole="wholesaler" userRole={role}>
+            <WholesalerInventory />
+          </ProtectedRoute>
+        } />
+        <Route path="/wholesaler-incoming-orders" element={
+          <ProtectedRoute allowedRole="wholesaler" userRole={role}>
+            <WholesalerIncomingOrders />
+          </ProtectedRoute>
+        } />
+        <Route path="/wholesaler-history" element={
+          <ProtectedRoute allowedRole="wholesaler" userRole={role}>
+            <WholesalerTransactionHistory />
+          </ProtectedRoute>
+        } />
+
       </Routes>
 
       <AppFooter />

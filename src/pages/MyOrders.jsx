@@ -13,16 +13,17 @@ import Stack from 'react-bootstrap/Stack';
 import ListGroup from 'react-bootstrap/ListGroup';
 import Button from 'react-bootstrap/Button';
 
-// Import CSS for the calendar link styling
 import './MyOrders.css';
-
-// Removed 'react-bootstrap-icons' to prevent build errors
-// import { CalendarEvent } from 'react-bootstrap-icons';
 
 function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate(); 
+
+  // --- CONFIGURATION: STOCK DATE ---
+  // We will use this date for EVERYTHING.
+  const HARDCODED_DISPLAY_DATE = "November 28, 2025";
+  const HARDCODED_CALENDAR_DATE = "20251128"; // Format: YYYYMMDD
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
@@ -30,14 +31,14 @@ function MyOrders() {
         const ordersRef = collection(db, "orders");
         const q = query(ordersRef, where("userId", "==", user.uid)); 
 
-        // Real-time listener
         const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
           const ordersData = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
-          // Sort by date (newest first)
-          ordersData.sort((a, b) => new Date(b.date) - new Date(a.date));
+          
+          // We just load the data without worrying about sorting by date 
+          // since we are using a fake date for everyone.
           setOrders(ordersData);
           setLoading(false);
         }, (error) => {
@@ -57,10 +58,17 @@ function MyOrders() {
 
   // --- CALENDAR FUNCTIONALITY ---
   const downloadCalendarEvent = (order) => {
-    // Create simple ICS content
-    const dateStr = order.date.replace(/-/g, ''); // YYYYMMDD
-    const description = `Order ID: ${order.id}\\nItems: ${order.products.map(p => p.name).join(', ')}`;
-    
+    // 1. Use the STOCK DATE requested
+    const dateStr = HARDCODED_CALENDAR_DATE;
+
+    // 2. Safely handle products array
+    const productList = order.products 
+        ? order.products.map(p => p.name).join(', ') 
+        : 'Order details';
+
+    const description = `Order ID: ${order.id}\\nItems: ${productList}`;
+    const location = order.deliveryAddress || 'Online Order';
+
     const icsContent = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -69,7 +77,7 @@ function MyOrders() {
       `DTEND;VALUE=DATE:${dateStr}`,
       `SUMMARY:LiveMart Delivery - Order #${order.id.slice(0, 6)}`,
       `DESCRIPTION:${description}`,
-      `LOCATION:${order.deliveryAddress}`,
+      `LOCATION:${location}`,
       'END:VEVENT',
       'END:VCALENDAR'
     ].join('\n');
@@ -139,19 +147,22 @@ function MyOrders() {
                     <Col md={4} className="mt-3 mt-md-0">
                       <h5 className="fw-bold">Summary</h5>
                       <Stack gap={2}>
-                        <div className="d-flex justify-content-between"><span className="text-muted">Date:</span><span>{order.date}</span></div>
-                        <div className="d-flex justify-content-between"><span className="text-muted">Total:</span><h5 className="fw-bold text-success mb-0">${Number(order.totalAmount).toFixed(2)}</h5></div>
-                        <div className="d-flex justify-content-between"><span className="text-muted">Address:</span><span>{order.deliveryAddress}</span></div>
+                        <div className="d-flex justify-content-between">
+                            <span className="text-muted">Date:</span>
+                            {/* Using the Hardcoded Date */}
+                            <span>{HARDCODED_DISPLAY_DATE}</span>
+                        </div>
+                        <div className="d-flex justify-content-between"><span className="text-muted">Total:</span><h5 className="fw-bold text-success mb-0">${Number(order.totalAmount || 0).toFixed(2)}</h5></div>
+                        <div className="d-flex justify-content-between"><span className="text-muted">Address:</span><span>{order.deliveryAddress || 'N/A'}</span></div>
                         
                         <hr />
-                        {/* CALENDAR LINK */}
                         <Button 
                           variant="outline-primary" 
                           size="sm" 
                           className="calendar-btn"
                           onClick={() => downloadCalendarEvent(order)}
                         >
-                          <span className="me-2">📅</span> {/* Using Emoji instead of Icon */}
+                          <span className="me-2">📅</span> 
                           Add to Calendar
                         </Button>
 

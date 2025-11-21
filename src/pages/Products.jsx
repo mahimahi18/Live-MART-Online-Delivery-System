@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '../firebase'; 
-// We kept the Firestore imports needed for the CART, but removed the ones for reviews
+// KEPT YOUR EXACT IMPORTS + updateDoc for the Stock Generator
 import { 
   collection, 
   onSnapshot, 
   doc, 
-  runTransaction 
+  runTransaction,
+  updateDoc 
 } from 'firebase/firestore'; 
 import { useNavigate } from 'react-router-dom';
 
@@ -20,11 +21,12 @@ import Alert from 'react-bootstrap/Alert';
 import Form from 'react-bootstrap/Form';
 import Modal from 'react-bootstrap/Modal';
 import FloatingLabel from 'react-bootstrap/FloatingLabel';
+import Badge from 'react-bootstrap/Badge';
 
 // Icons
-import { StarFill, StarHalf, Star, ChatLeftText } from 'react-bootstrap-icons';
+import { StarFill, StarHalf, Star, ChatLeftText, Gear } from 'react-bootstrap-icons';
 
-// ⭐ FAKE DATA GENERATOR (To make it look real)
+// ⭐ FAKE DATA GENERATOR
 const MOCK_REVIEWS = [
   { id: 101, userName: "Alice M.", rating: 5, comment: "Absolutely love this! Great quality.", date: new Date() },
   { id: 102, userName: "John D.", rating: 4, comment: "Good value for money, fast shipping.", date: new Date() },
@@ -35,24 +37,23 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [adding, setAdding] = useState(null);
+  const [generatingStock, setGeneratingStock] = useState(false);
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
 
-  // ⭐ REVIEWS STATE (Local Only)
+  // ⭐ REVIEWS STATE
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
-  const [reviews, setReviews] = useState([]); // Local array for reviews
-  
-  // Form State
+  const [reviews, setReviews] = useState([]); 
   const [userRating, setUserRating] = useState(0);
   const [userComment, setUserComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
 
   const navigate = useNavigate();
 
-  // ------------------- FETCH PRODUCTS (From Firebase) -------------------
+  // ------------------- FETCH PRODUCTS -------------------
   useEffect(() => {
     const unsubscribe = onSnapshot(
       collection(db, "products"),
@@ -74,7 +75,31 @@ export default function Products() {
     return () => unsubscribe();
   }, []);
 
-  // ------------------- ADD TO CART (Kept connected to Firebase) -------------------
+  // ------------------- 🛠️ STOCK GENERATOR (ONE TIME USE) -------------------
+  const handleGenerateStock = async () => {
+    if(!window.confirm("This will give every product a random stock count (0-20). Continue?")) return;
+    
+    setGeneratingStock(true);
+    try {
+      // We loop through loaded products and update them one by one
+      // This uses your existing 'db' connection
+      const updates = products.map(product => {
+        const randomStock = Math.floor(Math.random() * 21); // Random 0 to 20
+        const productRef = doc(db, "products", product.id);
+        return updateDoc(productRef, { stock: randomStock });
+      });
+
+      await Promise.all(updates);
+      alert("Success! All products now have random stock.");
+    } catch (error) {
+      console.error("Error generating stock:", error);
+      alert("Failed to update stock.");
+    } finally {
+      setGeneratingStock(false);
+    }
+  };
+
+  // ------------------- ADD TO CART -------------------
   const handleAddToCart = async (product) => {
     setAdding(product.id);
     const user = auth.currentUser;
@@ -85,6 +110,13 @@ export default function Products() {
       return;
     }
 
+    // Check stock before adding (Client side check)
+    if (product.stock && product.stock <= 0) {
+        alert("Item is out of stock!");
+        setAdding(null);
+        return;
+    }
+
     const cartItemRef = doc(db, "users", user.uid, "cart", product.id);
 
     try {
@@ -92,6 +124,10 @@ export default function Products() {
         const cartDoc = await transaction.get(cartItemRef);
         if (cartDoc.exists()) {
           const newQuantity = cartDoc.data().quantity + 1;
+          // Optional: Check if we are exceeding stock limit
+          if (product.stock && newQuantity > product.stock) {
+              throw new Error("OUT_OF_STOCK");
+          }
           transaction.update(cartItemRef, { quantity: newQuantity });
         } else {
           transaction.set(cartItemRef, {
@@ -104,74 +140,52 @@ export default function Products() {
       });
     } catch (err) {
       console.error("Error adding to cart: ", err);
-      alert("Error adding to cart.");
+      if (err.message === "OUT_OF_STOCK") {
+          alert("You cannot add more than the available stock.");
+      } else {
+          alert("Error adding to cart.");
+      }
     } finally {
       setAdding(null);
     }
   };
 
-  // ------------------- FAKE REVIEW SUBMIT -------------------
+  // ------------------- REVIEW HANDLERS -------------------
   const handleSubmitReview = (e) => {
     e.preventDefault();
-    
-    // 1. Basic Validation
-    if (userRating === 0) {
-      alert("Please select a star rating.");
-      return;
-    }
-
+    if (userRating === 0) { alert("Please select a star rating."); return; }
     setSubmittingReview(true);
 
-    // 2. Simulate network delay (makes it feel real)
     setTimeout(() => {
       const user = auth.currentUser;
-      
-      // Create a fake review object
       const newReview = {
-        id: Date.now(), // Generate a random ID
+        id: Date.now(),
         userName: user ? (user.displayName || user.email) : "Guest User",
         rating: userRating,
         comment: userComment,
         date: new Date()
       };
-
-      // 3. Update Local Review List
       setReviews([newReview, ...reviews]);
-
-      // 4. Update Local Product Rating (Visual Update Only)
-      // This makes the stars on the card update instantly without touching the database!
       const newTotalReviews = reviews.length + 1;
       const oldRating = currentProduct.rating || 0;
-      // Approximate new average
       const newAverage = ((oldRating * reviews.length) + userRating) / newTotalReviews;
 
-      // Update the products array locally
       setProducts(prevProducts => 
         prevProducts.map(p => 
           p.id === currentProduct.id ? { ...p, rating: newAverage } : p
         )
       );
 
-      // Cleanup
       setUserComment("");
       setUserRating(0);
       setSubmittingReview(false);
-      
-      // Optional: Show simple alert
-      // alert("Review submitted successfully!");
     }, 800);
   };
 
-  // ------------------- HANDLERS -------------------
   const openReviews = (product) => {
     setCurrentProduct(product);
     setShowReviewModal(true);
-    
-    // ⭐ Load Mock Data mixed with any local state logic if needed
-    // For now, we just reset to the mock list every time we open a new product
-    // so it doesn't look empty.
     setReviews([...MOCK_REVIEWS]); 
-    
     setUserRating(0);
     setUserComment("");
   };
@@ -181,7 +195,6 @@ export default function Products() {
     setCurrentProduct(null);
   };
 
-  // ------------------- STAR RENDER -------------------
   const renderStars = (rating) => {
     const stars = [];
     const fullStars = Math.floor(rating || 0);
@@ -194,7 +207,6 @@ export default function Products() {
     return <div className="text-warning small">{stars}</div>;
   };
 
-  // Star Input Helper
   const renderStarInput = () => {
     return (
       <div className="mb-3">
@@ -213,7 +225,6 @@ export default function Products() {
     );
   };
 
-  // ------------------- FILTER LOGIC -------------------
   const filteredProducts = products.filter((p) => {
     const matchesSearch =
       p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -268,7 +279,10 @@ export default function Products() {
           <Row className="g-4">
             {filteredProducts.map((product) => {
               const price = Number(product.price) || 0;
-              const stock = Number(product.stock) || 0;
+              
+              // ⭐ NEW: STOCK LOGIC
+              // If stock is undefined, default to 0 so it shows "Out of Stock"
+              const stock = product.stock !== undefined ? Number(product.stock) : 0;
               const isOutOfStock = stock <= 0;
 
               return (
@@ -286,28 +300,32 @@ export default function Products() {
                         {product.description}
                       </Card.Text>
 
-                      <div className="d-flex justify-content-between align-items-center mb-3">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
                         <h4 className="text-success fw-bold mb-0">${price.toFixed(2)}</h4>
-                        <div 
-                          onClick={() => openReviews(product)} 
-                          style={{cursor: 'pointer'}} 
-                          title="View Reviews"
-                        >
+                        <div onClick={() => openReviews(product)} style={{cursor: 'pointer'}}>
                            {renderStars(product.rating)}
-                           <small className="text-muted ms-1" style={{fontSize: '0.8rem'}}>
-                             (View)
-                           </small>
+                           <small className="text-muted ms-1">(View)</small>
                         </div>
+                      </div>
+
+                      {/* ⭐ STOCK BADGE */}
+                      <div className="mb-3">
+                        {isOutOfStock ? (
+                          <Badge bg="danger">Out of Stock</Badge>
+                        ) : (
+                          <Badge bg="success">In Stock: {stock}</Badge>
+                        )}
                       </div>
 
                       <div className="d-flex gap-2 mt-auto">
                         <Button
+                            // ⭐ DISABLE BUTTON IF OUT OF STOCK
                             variant={isOutOfStock ? "secondary" : "primary"}
                             className="flex-grow-1"
                             onClick={() => handleAddToCart(product)}
                             disabled={adding === product.id || isOutOfStock}
                         >
-                            {isOutOfStock ? "Out of Stock" : adding === product.id ? "Adding..." : "Add to Cart"}
+                            {isOutOfStock ? "Sold Out" : adding === product.id ? "Adding..." : "Add to Cart"}
                         </Button>
                         <Button variant="outline-secondary" onClick={() => openReviews(product)}>
                             <ChatLeftText />
@@ -322,14 +340,27 @@ export default function Products() {
         )}
       </Container>
 
-      {/* ⭐ REVIEW MODAL (UI ONLY - NO FIREBASE SAVE) ⭐ */}
+      {/* ⭐ ADMIN SECTION (For Testing) */}
+      <Container className="py-5 text-center">
+         <hr className="mb-4"/>
+         <p className="text-muted small">Admin Tools (For Demo Only)</p>
+         <Button 
+           variant="outline-dark" 
+           size="sm" 
+           onClick={handleGenerateStock} 
+           disabled={generatingStock}
+         >
+           <Gear className="me-1"/> 
+           {generatingStock ? "Generating..." : "Generate Random Stock (0-20)"}
+         </Button>
+      </Container>
+
+      {/* REVIEWS MODAL */}
       <Modal show={showReviewModal} onHide={closeReviews} centered size="lg">
         <Modal.Header closeButton>
           <Modal.Title>Reviews: {currentProduct?.name}</Modal.Title>
         </Modal.Header>
         <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-          
-          {/* 1. LIST FAKE REVIEWS */}
           <h5 className="mb-3">Customer Feedback</h5>
           <div className="mb-4">
               {reviews.map((review) => (
@@ -340,39 +371,30 @@ export default function Products() {
                       {renderStars(review.rating)}
                     </div>
                     <p className="mb-0 mt-1">{review.comment}</p>
-                    <small className="text-muted">
-                      {review.date.toLocaleDateString()}
-                    </small>
+                    <small className="text-muted">{review.date.toLocaleDateString()}</small>
                   </Card.Body>
                 </Card>
               ))}
           </div>
-
           <hr />
-
-          {/* 2. ADD REVIEW FORM (LOCAL STATE ONLY) */}
           <h5>Write a Review</h5>
           <Form onSubmit={handleSubmitReview}>
              {renderStarInput()}
-             
              <FloatingLabel controlId="reviewText" label="Share your thoughts..." className="mb-3">
                <Form.Control
                  as="textarea"
-                 placeholder="Leave a comment here"
                  style={{ height: '100px' }}
                  value={userComment}
                  onChange={(e) => setUserComment(e.target.value)}
                  required
                />
              </FloatingLabel>
-
              <div className="d-grid">
                <Button type="submit" variant="success" disabled={submittingReview}>
                  {submittingReview ? "Posting..." : "Submit Review"}
                </Button>
              </div>
           </Form>
-
         </Modal.Body>
       </Modal>
     </>
