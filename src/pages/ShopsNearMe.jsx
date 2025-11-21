@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
-import { getProductsNearMe } from '../services/productService';
+import { getProductsNearMe } from './services/productService';
 import Container from 'react-bootstrap/Container';
 import Form from 'react-bootstrap/Form';
 import Row from 'react-bootstrap/Row';
@@ -56,7 +56,7 @@ export default function ShopsNearMe() {
         />
       </Form.Group>
 
-      <LoadScript googleMapsApiKey="AIzaSyAkXrnCfqCoIRY2NgBBZeodEssBmxBlIWTo">
+      <LoadScript googleMapsApiKey="AIzaSyAkXrnCfqCoIRY2NgBBZeodEssBmxBlWTo">
         <GoogleMap mapContainerStyle={containerStyle} center={center} zoom={11}>
           <Marker position={center} label="Me" />
 
