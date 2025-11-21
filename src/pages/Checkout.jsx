@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, onSnapshot, addDoc, doc, writeBatch } from 'firebase/firestore';
+// UPDATED IMPORTS: Removed addDoc, writeBatch. Added functions imports.
+import { collection, onSnapshot } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 
 // React-Bootstrap
@@ -29,7 +31,7 @@ export default function Checkout() {
   const [zip, setZip] = useState("");
   const [cardNumber, setCardNumber] = useState("");
 
-  // 1. Fetch Cart Items 
+  // 1. Fetch Cart Items
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) {
@@ -51,14 +53,14 @@ export default function Checkout() {
     return () => unsubscribe();
   }, [navigate]);
 
-  // Calculate Total - SAFELY (Handles if price is a string or number)
+  // Calculate Total
   const total = cartItems.reduce((acc, item) => {
     const price = Number(item.price) || 0;
     const qty = Number(item.quantity) || 1;
     return acc + (price * qty);
   }, 0);
 
-  // 2. THE PLACE ORDER FUNCTION
+  // 2. THE NEW "HYBRID" PLACE ORDER FUNCTION
   const handlePlaceOrder = async (e) => {
     e.preventDefault(); 
 
@@ -69,51 +71,36 @@ export default function Checkout() {
 
     setProcessing(true); 
 
-    // Simulate network delay
-    setTimeout(async () => {
-      try {
-        const user = auth.currentUser;
+    try {
+      // Initialize Firebase Functions
+      const functions = getFunctions();
+      const placeOrderFn = httpsCallable(functions, 'placeOrder');
+      
+      // Combine address fields - FIXED SYNTAX HERE
+      const fullAddress = `${address}, ${city}, ${zip}`;
+
+      // CALL THE BACKEND
+      const result = await placeOrderFn({ 
+        deliveryAddress: fullAddress,
+        paymentMode: "Credit Card (Mock)" 
+      });
+
+      if (result.data.success) {
+        console.log("Order placed successfully! ID:", result.data.orderId);
+        // FIXED SYNTAX HERE
+        alert(`Order Confirmed! Your Order ID is: ${result.data.orderId}`);
         
-        // --- SANITIZE DATA ---
-        // Ensure all numbers are actually numbers so database doesn't reject them
-        const cleanProducts = cartItems.map(item => ({
-          name: item.name || "Unknown Product",
-          quantity: Number(item.quantity) || 1,
-          price: Number(item.price) || 0
-        }));
-
-        const orderData = {
-          userId: user.uid,
-          date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
-          totalAmount: Number(total), // Ensure this is a Number
-          // I REMOVED "status" HERE - It is often the cause of permission errors
-          deliveryAddress: `${address}, ${city}, ${zip}`,
-          products: cleanProducts // Send the clean list
-        };
-
-        // A. Create the Order
-        await addDoc(collection(db, "orders"), orderData);
-
-        // B. Clear the User's Cart
-        const batch = writeBatch(db);
-        cartItems.forEach((item) => {
-          const itemRef = doc(db, "users", user.uid, "cart", item.id);
-          batch.delete(itemRef);
-        });
-        await batch.commit();
-
-        // C. Success!
-        console.log("Order placed successfully!");
+        // Navigate to Orders page
         navigate('/my-orders'); 
-
-      } catch (error) {
-        console.error("Error placing order:", error);
-        // IMPORTANT: This logs the REAL error to your Console (F12)
-        alert(`Failed to place order: ${error.message}`);
-      } finally {
-        setProcessing(false);
       }
-    }, 2000); 
+
+    } catch (error) {
+      console.error("Error placing order:", error);
+      // FIXED SYNTAX HERE
+      alert(`Failed: ${error.message}`);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   if (loading) return <div className="text-center mt-5"><Spinner animation="border" variant="success" /></div>;
@@ -192,13 +179,12 @@ export default function Checkout() {
               <Card.Header className="bg-light fw-bold">Order Summary</Card.Header>
               <ListGroup variant="flush">
                 {cartItems.map(item => {
-                    // Safety check for display as well
                     const displayPrice = Number(item.price) || 0;
                     const displayQty = Number(item.quantity) || 1;
                     return (
                       <ListGroup.Item key={item.id} className="d-flex justify-content-between align-items-center">
                         <div>
-                          <div className="fw-bold">{item.name}</div>
+                          <div className="fw-bold">{item.name || item.title}</div>
                           <small className="text-muted">Qty: {displayQty}</small>
                         </div>
                         <span>${(displayPrice * displayQty).toFixed(2)}</span>
