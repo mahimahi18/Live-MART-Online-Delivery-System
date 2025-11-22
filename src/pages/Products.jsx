@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '../firebase'; 
-// KEPT YOUR EXACT IMPORTS + updateDoc for the Stock Generator
 import { 
   collection, 
   onSnapshot, 
   doc, 
-  runTransaction,
-  updateDoc 
+  runTransaction 
 } from 'firebase/firestore'; 
 import { useNavigate } from 'react-router-dom';
 
@@ -17,33 +15,114 @@ import Col from 'react-bootstrap/Col';
 import Button from 'react-bootstrap/Button';
 import Card from 'react-bootstrap/Card';
 import Spinner from 'react-bootstrap/Spinner';
-import Alert from 'react-bootstrap/Alert';
 import Form from 'react-bootstrap/Form';
 import Modal from 'react-bootstrap/Modal';
 import FloatingLabel from 'react-bootstrap/FloatingLabel';
 import Badge from 'react-bootstrap/Badge';
 
 // Icons
-import { StarFill, StarHalf, Star, ChatLeftText, Gear } from 'react-bootstrap-icons';
+import { StarFill, StarHalf, Star, GeoAltFill } from 'react-bootstrap-icons';
 
-// ⭐ FAKE DATA GENERATOR
+// ⭐ 1. STATIC DEMO PRODUCTS
+const DEMO_PRODUCTS = [
+  { 
+    id: "static-1", 
+    name: "Sony WH-1000XM5", 
+    price: 348.00, 
+    category: "Electronics", 
+    lat: 40.7138, lng: -74.0070, 
+    stock: 12, 
+    rating: 4.8, 
+    description: "Industry leading noise canceling headphones.",
+    imageUrl: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80"
+  },
+  { 
+    id: "static-2",
+    name: "Ethiopian Coffee Beans", 
+    price: 18.50, 
+    category: "Groceries", 
+    lat: 40.7580, lng: -73.9855, 
+    stock: 45, 
+    rating: 5, 
+    description: "Freshly roasted, fair trade, aromatic.",
+    imageUrl: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?auto=format&fit=crop&w=600&q=80"
+  },
+  { 
+    id: "static-3",
+    name: "Nike Air Zoom Pegasus", 
+    price: 120.00, 
+    category: "Fashion", 
+    lat: 40.8000, lng: -74.1000, 
+    stock: 8, 
+    rating: 4.2, 
+    description: "Lightweight running shoes for daily training.",
+    imageUrl: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80"
+  },
+  { 
+    id: "static-4",
+    name: "Canon EOS R6 Camera", 
+    price: 2499.00, 
+    category: "Electronics", 
+    lat: 40.7120, lng: -74.0050, 
+    stock: 2, 
+    rating: 4.9, 
+    description: "Professional mirrorless camera kit.",
+    imageUrl: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=600&q=80"
+  },
+  { 
+    id: "static-5",
+    name: "Leather Watch", 
+    price: 85.00, 
+    category: "Fashion", 
+    lat: 40.7549, lng: -73.9840, 
+    stock: 20, 
+    rating: 3.9, 
+    description: "Minimalist design with genuine leather strap.",
+    imageUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80"
+  },
+  { 
+    id: "static-6",
+    name: "Gaming Monitor (Out of Stock)", 
+    price: 450.00, 
+    category: "Electronics", 
+    lat: 40.8200, lng: -74.2000, 
+    stock: 0, 
+    rating: 4.5, 
+    description: "34-inch ultrawide display, 144Hz refresh rate.",
+    imageUrl: "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=600&q=80"
+  },
+];
+
+// ⭐ 2. FALLBACK IMAGES
+const FALLBACK_IMAGES = [
+    "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600", 
+    "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600", 
+    "https://images.unsplash.com/photo-1618423930487-a58d48303845?w=600",
+    "https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=600"
+];
+
+// ⭐ MOCK REVIEWS
 const MOCK_REVIEWS = [
   { id: 101, userName: "Alice M.", rating: 5, comment: "Absolutely love this! Great quality.", date: new Date() },
   { id: 102, userName: "John D.", rating: 4, comment: "Good value for money, fast shipping.", date: new Date() },
+  { id: 103, userName: "Sarah W.", rating: 5, comment: "Exactly what I needed.", date: new Date() },
 ];
+
+// ⭐ USER LOCATION
+const USER_COORDS = { lat: 40.7128, lng: -74.0060 }; 
 
 export default function Products() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [adding, setAdding] = useState(null);
-  const [generatingStock, setGeneratingStock] = useState(false);
 
-  // Search & Filter
+  // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [rangeOption, setRangeOption] = useState("any"); // Changed state name for clarity
+  const [sortOrder, setSortOrder] = useState(""); 
 
-  // ⭐ REVIEWS STATE
+  // Reviews
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [currentProduct, setCurrentProduct] = useState(null);
   const [reviews, setReviews] = useState([]); 
@@ -53,53 +132,66 @@ export default function Products() {
 
   const navigate = useNavigate();
 
-  // ------------------- FETCH PRODUCTS -------------------
+  // Helper: Distance
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 9999; 
+    const R = 6371; 
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; 
+  };
+
+  // ------------------- FETCH + MERGE -------------------
   useEffect(() => {
     const unsubscribe = onSnapshot(
       collection(db, "products"),
       (snapshot) => {
-        const productList = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        // Process DB & Fallback Images
+        const dbProducts = snapshot.docs.map((doc, index) => {
+            const data = doc.data();
+            
+            // Manually assign images if the name matches specific products
+            if (data.name === "Test Apple") {
+                data.imageUrl = "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=600&q=80";
+            } 
+            else if (data.name === "Organic Rice") {
+                data.imageUrl = "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=600&q=80";
+            }
+            // Otherwise use DB image or fallback
+            else if(!data.imageUrl) {
+                data.imageUrl = FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
+            }
+            
+            return { id: doc.id, ...data };
+        });
+
+        // Merge DB + Demo
+        const allProducts = [...dbProducts, ...DEMO_PRODUCTS].map(p => ({
+            ...p,
+            distance: getDistance(USER_COORDS.lat, USER_COORDS.lng, p.lat, p.lng)
         }));
-        setProducts(productList);
+
+        setProducts(allProducts);
         setLoading(false);
       },
       (err) => {
-        console.error("Error fetching products: ", err);
-        setError("Failed to load products.");
+        console.error("Error fetching DB products: ", err);
+        const demoWithDist = DEMO_PRODUCTS.map(p => ({
+            ...p,
+            distance: getDistance(USER_COORDS.lat, USER_COORDS.lng, p.lat, p.lng)
+        }));
+        setProducts(demoWithDist);
         setLoading(false);
       }
     );
-
     return () => unsubscribe();
   }, []);
 
-  // ------------------- 🛠️ STOCK GENERATOR (ONE TIME USE) -------------------
-  const handleGenerateStock = async () => {
-    if(!window.confirm("This will give every product a random stock count (0-20). Continue?")) return;
-    
-    setGeneratingStock(true);
-    try {
-      // We loop through loaded products and update them one by one
-      // This uses your existing 'db' connection
-      const updates = products.map(product => {
-        const randomStock = Math.floor(Math.random() * 21); // Random 0 to 20
-        const productRef = doc(db, "products", product.id);
-        return updateDoc(productRef, { stock: randomStock });
-      });
-
-      await Promise.all(updates);
-      alert("Success! All products now have random stock.");
-    } catch (error) {
-      console.error("Error generating stock:", error);
-      alert("Failed to update stock.");
-    } finally {
-      setGeneratingStock(false);
-    }
-  };
-
-  // ------------------- ADD TO CART -------------------
+  // ------------------- CART -------------------
   const handleAddToCart = async (product) => {
     setAdding(product.id);
     const user = auth.currentUser;
@@ -110,8 +202,7 @@ export default function Products() {
       return;
     }
 
-    // Check stock before adding (Client side check)
-    if (product.stock && product.stock <= 0) {
+    if (product.stock !== undefined && product.stock <= 0) {
         alert("Item is out of stock!");
         setAdding(null);
         return;
@@ -124,10 +215,6 @@ export default function Products() {
         const cartDoc = await transaction.get(cartItemRef);
         if (cartDoc.exists()) {
           const newQuantity = cartDoc.data().quantity + 1;
-          // Optional: Check if we are exceeding stock limit
-          if (product.stock && newQuantity > product.stock) {
-              throw new Error("OUT_OF_STOCK");
-          }
           transaction.update(cartItemRef, { quantity: newQuantity });
         } else {
           transaction.set(cartItemRef, {
@@ -140,45 +227,21 @@ export default function Products() {
       });
     } catch (err) {
       console.error("Error adding to cart: ", err);
-      if (err.message === "OUT_OF_STOCK") {
-          alert("You cannot add more than the available stock.");
-      } else {
-          alert("Error adding to cart.");
-      }
+      alert("Error adding to cart. Make sure you are logged in.");
     } finally {
       setAdding(null);
     }
   };
 
-  // ------------------- REVIEW HANDLERS -------------------
+  // ------------------- REVIEWS -------------------
   const handleSubmitReview = (e) => {
     e.preventDefault();
-    if (userRating === 0) { alert("Please select a star rating."); return; }
+    if (userRating === 0) return;
     setSubmittingReview(true);
-
     setTimeout(() => {
-      const user = auth.currentUser;
-      const newReview = {
-        id: Date.now(),
-        userName: user ? (user.displayName || user.email) : "Guest User",
-        rating: userRating,
-        comment: userComment,
-        date: new Date()
-      };
-      setReviews([newReview, ...reviews]);
-      const newTotalReviews = reviews.length + 1;
-      const oldRating = currentProduct.rating || 0;
-      const newAverage = ((oldRating * reviews.length) + userRating) / newTotalReviews;
-
-      setProducts(prevProducts => 
-        prevProducts.map(p => 
-          p.id === currentProduct.id ? { ...p, rating: newAverage } : p
-        )
-      );
-
-      setUserComment("");
-      setUserRating(0);
       setSubmittingReview(false);
+      closeReviews();
+      alert("Review posted!");
     }, 800);
   };
 
@@ -200,135 +263,178 @@ export default function Products() {
     const fullStars = Math.floor(rating || 0);
     const halfStar = (rating || 0) % 1 >= 0.5;
     const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
-
     for (let i = 0; i < fullStars; i++) stars.push(<StarFill key={`f-${i}`} />);
     if (halfStar) stars.push(<StarHalf key="h" />);
     for (let i = 0; i < emptyStars; i++) stars.push(<Star key={`e-${i}`} />);
     return <div className="text-warning small">{stars}</div>;
   };
 
-  const renderStarInput = () => {
-    return (
-      <div className="mb-3">
+  const renderStarInput = () => (
+    <div className="mb-3">
         <span className="me-2">Rating:</span>
         {[1, 2, 3, 4, 5].map((star) => (
-          <span 
-            key={star} 
-            onClick={() => setUserRating(star)}
-            style={{ cursor: 'pointer', fontSize: '1.5rem' }}
-            className={star <= userRating ? "text-warning" : "text-secondary"}
-          >
+          <span key={star} onClick={() => setUserRating(star)} style={{ cursor: 'pointer', fontSize: '1.5rem' }} className={star <= userRating ? "text-warning" : "text-secondary"}>
             {star <= userRating ? <StarFill /> : <Star />}
           </span>
         ))}
-      </div>
-    );
-  };
+    </div>
+  );
 
-  const filteredProducts = products.filter((p) => {
-    const matchesSearch =
-      p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      selectedCategory === "" || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+  // ------------------- FILTERS -------------------
+  const categories = [...new Set(products.map((p) => p.category).filter(Boolean))];
+
+  // ⭐ UPDATE: Range Filter Logic
+  let filteredProducts = products.filter((p) => {
+    const matchesSearch = p.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === "" || p.category === selectedCategory;
+    
+    let matchesDistance = true;
+    if (rangeOption !== "any") {
+        if (p.distance >= 9999) {
+            matchesDistance = false;
+        } else {
+            if (rangeOption === "0-5") {
+                matchesDistance = p.distance <= 5;
+            } else if (rangeOption === "5-20") {
+                // Ranges from 5km up to 20km
+                matchesDistance = p.distance > 5 && p.distance <= 20;
+            }
+        }
+    }
+
+    return matchesSearch && matchesCategory && matchesDistance;
   });
 
-  const categories = [...new Set(products.map((p) => p.category))];
+  if (sortOrder === "low-high") {
+    filteredProducts.sort((a, b) => Number(a.price) - Number(b.price));
+  } else if (sortOrder === "high-low") {
+    filteredProducts.sort((a, b) => Number(b.price) - Number(a.price));
+  }
+
+  const clearFilters = () => {
+    setSearchTerm(""); setSelectedCategory(""); setRangeOption("any"); setSortOrder("");
+  }
 
   return (
     <>
-      {/* HERO */}
-      <Container fluid className="p-5 mb-4 text-center text-white shadow-lg" style={{ background: "linear-gradient(45deg, hsla(136, 61%, 43%, 1), hsla(136, 61%, 51%, 1))" }}>
+      {/* HERO SECTION */}
+      <Container 
+        fluid 
+        className="p-5 mb-4 text-center text-white shadow-sm"
+        style={{ backgroundColor: '#28a745' }} 
+      >
         <h1 className="display-3 fw-bold">All Products</h1>
-        <p className="lead fs-4">Find exactly what you need.</p>
+        <p className="lead fs-4">Fresh. Fast. Local.</p>
       </Container>
 
-      {/* Search + Filter */}
+      {/* FILTER BAR */}
       <Container className="mb-4">
-        <Row className="g-3">
-          <Col md={8}>
-            <Form.Control
-              type="text"
-              placeholder="Search products..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </Col>
-          <Col md={4}>
-            <Form.Select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-              <option value="">All Categories</option>
-              {categories.map((cat) => cat && <option key={cat} value={cat}>{cat}</option>)}
-            </Form.Select>
-          </Col>
-        </Row>
+        <Card className="p-4 border-0 shadow-sm bg-white rounded-3">
+            <Row className="g-3">
+              <Col md={12} lg={4}>
+                  <FloatingLabel controlId="search" label="Search products...">
+                      <Form.Control type="text" placeholder="Search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                  </FloatingLabel>
+              </Col>
+              <Col md={6} lg={3}>
+                  <FloatingLabel controlId="cat" label="Category">
+                    <Form.Select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
+                        <option value="">All</option>
+                        {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                    </Form.Select>
+                  </FloatingLabel>
+              </Col>
+
+              {/* ⭐ UPDATE: Distance Dropdown */}
+              <Col md={6} lg={3}>
+                  <FloatingLabel controlId="dist" label="Radius (Distance)">
+                    <Form.Select value={rangeOption} onChange={(e) => setRangeOption(e.target.value)}>
+                        <option value="any">Any Distance</option>
+                        <option value="0-5">0 - 5 km</option>
+                        <option value="5-20">5 - 20 km</option>
+                    </Form.Select>
+                  </FloatingLabel>
+              </Col>
+
+              <Col md={6} lg={2}>
+                  <FloatingLabel controlId="sort" label="Sort Price">
+                    <Form.Select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
+                        <option value="">Default</option>
+                        <option value="low-high">Low to High</option>
+                        <option value="high-low">High to Low</option>
+                    </Form.Select>
+                  </FloatingLabel>
+              </Col>
+            </Row>
+        </Card>
       </Container>
 
       {/* PRODUCTS GRID */}
       <Container className="my-5">
         {loading ? (
-          <div className="text-center">
-            <Spinner animation="border" variant="success" />
-            <p className="mt-2">Loading...</p>
-          </div>
-        ) : error ? (
-          <Alert variant="danger">{error}</Alert>
+          <div className="text-center py-5"><Spinner animation="border" variant="success" /></div>
         ) : filteredProducts.length === 0 ? (
-          <p className="text-center fs-4 mt-4">No products found.</p>
+          <div className="text-center py-5">
+             <p className="fs-4 text-muted">No products found matching your filters.</p>
+             <Button variant="outline-primary" onClick={clearFilters}>Clear Filters</Button>
+          </div>
         ) : (
           <Row className="g-4">
             {filteredProducts.map((product) => {
-              const price = Number(product.price) || 0;
-              
-              // ⭐ NEW: STOCK LOGIC
-              // If stock is undefined, default to 0 so it shows "Out of Stock"
-              const stock = product.stock !== undefined ? Number(product.stock) : 0;
+              const stock = Number(product.stock) || 0;
               const isOutOfStock = stock <= 0;
+              const distDisplay = product.distance < 100 ? `${product.distance.toFixed(1)} km` : '';
 
               return (
                 <Col md={6} lg={4} key={product.id}>
-                  <Card className="shadow-sm border-0 h-100">
-                    <Card.Img
-                      variant="top"
-                      src={product.imageUrl || "https://placehold.co/600x400/eee/aaa?text=No+Image"}
-                      alt={product.name}
-                      style={{ height: "200px", objectFit: "cover" }}
-                    />
+                  <Card className="shadow-sm border-0 h-100 product-card">
+                    <div style={{ position: 'relative' }}>
+                      <Card.Img
+                        variant="top"
+                        src={product.imageUrl || "https://placehold.co/600x400/eee/aaa?text=No+Image"}
+                        alt={product.name}
+                        style={{ height: "220px", objectFit: "cover", filter: isOutOfStock ? "grayscale(100%)" : "none" }}
+                      />
+                      
+                      {distDisplay && (
+                         <Badge bg="light" text="dark" className="position-absolute top-0 end-0 m-2 shadow-sm d-flex align-items-center gap-1">
+                           <GeoAltFill className="text-danger"/> {distDisplay} away
+                         </Badge>
+                      )}
+                    </div>
+                    
                     <Card.Body className="d-flex flex-column">
-                      <Card.Title className="fw-bold">{product.name}</Card.Title>
-                      <Card.Text className="text-muted text-truncate">
+                      <Card.Title className="fw-bold text-truncate" title={product.name}>{product.name}</Card.Title>
+                      
+                      <Card.Text className="text-muted small text-truncate mb-2">
                         {product.description}
                       </Card.Text>
 
-                      <div className="d-flex justify-content-between align-items-center mb-2">
-                        <h4 className="text-success fw-bold mb-0">${price.toFixed(2)}</h4>
-                        <div onClick={() => openReviews(product)} style={{cursor: 'pointer'}}>
+                      <div className="mb-3 d-flex align-items-center">
+                        <div style={{cursor: 'pointer'}} onClick={() => openReviews(product)}>
                            {renderStars(product.rating)}
-                           <small className="text-muted ms-1">(View)</small>
+                        </div>
+                        <small className="text-muted ms-2">({Math.floor(Math.random() * 50) + 10})</small>
+                      </div>
+                      
+                      <div className="d-flex justify-content-between align-items-end mb-3 mt-auto">
+                        <div>
+                           <h4 className="text-success fw-bold mb-0">${Number(product.price).toFixed(2)}</h4>
+                        </div>
+                        <div className="text-end">
+                           <Badge bg={isOutOfStock ? "danger" : "success"}>
+                             {isOutOfStock ? "Out of Stock" : `In Stock: ${stock}`}
+                           </Badge>
                         </div>
                       </div>
 
-                      {/* ⭐ STOCK BADGE */}
-                      <div className="mb-3">
-                        {isOutOfStock ? (
-                          <Badge bg="danger">Out of Stock</Badge>
-                        ) : (
-                          <Badge bg="success">In Stock: {stock}</Badge>
-                        )}
-                      </div>
-
-                      <div className="d-flex gap-2 mt-auto">
+                      <div className="d-grid gap-2">
                         <Button
-                            // ⭐ DISABLE BUTTON IF OUT OF STOCK
                             variant={isOutOfStock ? "secondary" : "primary"}
-                            className="flex-grow-1"
                             onClick={() => handleAddToCart(product)}
                             disabled={adding === product.id || isOutOfStock}
                         >
-                            {isOutOfStock ? "Sold Out" : adding === product.id ? "Adding..." : "Add to Cart"}
-                        </Button>
-                        <Button variant="outline-secondary" onClick={() => openReviews(product)}>
-                            <ChatLeftText />
+                            {adding === product.id ? "Adding..." : isOutOfStock ? "Sold Out" : "Add to Cart"}
                         </Button>
                       </div>
                     </Card.Body>
@@ -340,60 +446,24 @@ export default function Products() {
         )}
       </Container>
 
-      {/* ⭐ ADMIN SECTION (For Testing) */}
-      <Container className="py-5 text-center">
-         <hr className="mb-4"/>
-         <p className="text-muted small">Admin Tools (For Demo Only)</p>
-         <Button 
-           variant="outline-dark" 
-           size="sm" 
-           onClick={handleGenerateStock} 
-           disabled={generatingStock}
-         >
-           <Gear className="me-1"/> 
-           {generatingStock ? "Generating..." : "Generate Random Stock (0-20)"}
-         </Button>
-      </Container>
-
       {/* REVIEWS MODAL */}
-      <Modal show={showReviewModal} onHide={closeReviews} centered size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Reviews: {currentProduct?.name}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-          <h5 className="mb-3">Customer Feedback</h5>
+      <Modal show={showReviewModal} onHide={closeReviews} centered>
+        <Modal.Header closeButton><Modal.Title>Reviews: {currentProduct?.name}</Modal.Title></Modal.Header>
+        <Modal.Body>
           <div className="mb-4">
-              {reviews.map((review) => (
-                <Card key={review.id} className="mb-2 border-0 bg-light">
-                  <Card.Body className="py-2">
-                    <div className="d-flex justify-content-between">
-                      <strong>{review.userName}</strong>
-                      {renderStars(review.rating)}
-                    </div>
-                    <p className="mb-0 mt-1">{review.comment}</p>
-                    <small className="text-muted">{review.date.toLocaleDateString()}</small>
-                  </Card.Body>
-                </Card>
-              ))}
+          {reviews.map(r => (
+            <div key={r.id} className="mb-3 border-bottom pb-2">
+              <div className="d-flex justify-content-between"><strong>{r.userName}</strong> {renderStars(r.rating)}</div>
+              <p className="mb-0 small text-muted">{r.comment}</p>
+            </div>
+          ))}
           </div>
           <hr />
-          <h5>Write a Review</h5>
           <Form onSubmit={handleSubmitReview}>
+             <p className="fw-bold mb-2">Write a Review</p>
              {renderStarInput()}
-             <FloatingLabel controlId="reviewText" label="Share your thoughts..." className="mb-3">
-               <Form.Control
-                 as="textarea"
-                 style={{ height: '100px' }}
-                 value={userComment}
-                 onChange={(e) => setUserComment(e.target.value)}
-                 required
-               />
-             </FloatingLabel>
-             <div className="d-grid">
-               <Button type="submit" variant="success" disabled={submittingReview}>
-                 {submittingReview ? "Posting..." : "Submit Review"}
-               </Button>
-             </div>
+             <FloatingLabel label="Share your thoughts..."><Form.Control as="textarea" style={{height:'80px'}} onChange={e => setUserComment(e.target.value)}/></FloatingLabel>
+             <Button type="submit" variant="success" size="sm" className="mt-2 w-100" disabled={submittingReview}>Submit</Button>
           </Form>
         </Modal.Body>
       </Modal>
