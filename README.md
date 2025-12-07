@@ -11,3 +11,5 @@ Firebase Firestore as our NoSQL database for its real-time syncing and easier in
 <br>
 Built using React, allowing us to develop reusable UI components and efficiently manage dynamic state across the application. For location-based features such as store locations, order distance calculations, and delivery mapping, we integrated the Google Maps JavaScript API.
 In order to support automated email flows for events like order confirmations, password recovery, and verification, we used Twilio’s SendGrid (SMTP), which integrates with Firebase Cloud Functions for server-side triggers. The application follows a Hybrid Cloud Architecture.
+
+Check dev branch, has not been merged to main yet
